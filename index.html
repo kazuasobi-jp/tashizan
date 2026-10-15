@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f6f1e7">
+<title>たしざん（音声の試作）</title>
+<style>
+  :root {
+    --bg: #f6f1e7; --card: #fffdf8; --ink: #2f3a40; --sub: #6b767c;
+    --accent: #2f7d6d; --accent-ink: #fff; --mic: #e08a2e; --line: #e2dccf;
+    --ok: #2f7d6d; --soft: #efe8d8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans JP", system-ui, sans-serif; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; min-height: 100%;
+    display: flex; flex-direction: column; gap: 16px; }
+  h1 { font-size: 22px; margin: 4px 0; }
+  p { line-height: 1.6; margin: 0; }
+  .small { font-size: 14px; color: var(--sub); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  button { font: inherit; border: 0; border-radius: 16px; cursor: pointer; touch-action: manipulation; }
+  .big { background: var(--accent); color: var(--accent-ink); font-size: 26px; font-weight: 700;
+    padding: 18px 24px; width: 100%; }
+  .sec { background: var(--soft); color: var(--ink); font-size: 18px; padding: 14px 18px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 200px; }
+  #home, #results { display: flex; flex-direction: column; gap: 12px; }
+  [hidden] { display: none !important; }
+
+  /* 問題の画面 */
+  #play { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  #prog { align-self: stretch; display: flex; justify-content: space-between; color: var(--sub); font-size: 16px; }
+  #q { font-size: clamp(64px, 18vw, 120px); font-weight: 800; letter-spacing: .04em; line-height: 1.1; text-align: center; }
+  .frame { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: min(100%, 420px);
+    background: var(--card); border: 3px solid var(--line); border-radius: 12px; padding: 8px; }
+  .frame span { aspect-ratio: 1; display: grid; place-items: center; font-size: clamp(26px, 8vw, 48px);
+    border: 2px dashed var(--line); border-radius: 8px; transition: transform .2s, background .2s; }
+  .frame span.lit { background: #fde9c8; transform: scale(1.12); }
+  #frames { display: flex; flex-direction: column; gap: 8px; align-items: center; width: 100%; }
+
+  #mic { width: 120px; height: 120px; border-radius: 50%; font-size: 56px; background: var(--soft);
+    color: var(--sub); display: grid; place-items: center; transition: background .2s, box-shadow .2s; }
+  #mic.on { background: var(--mic); color: #fff; box-shadow: 0 0 0 0 rgba(224,138,46,.6); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(224,138,46,.55); } 100% { box-shadow: 0 0 0 28px rgba(224,138,46,0); } }
+  #say { font-size: 28px; font-weight: 700; min-height: 1.4em; text-align: center; }
+  #heard { font-size: 14px; color: var(--sub); min-height: 1.2em; text-align: center; word-break: break-all; }
+  #choices { display: flex; gap: 12px; width: 100%; }
+  #choices button { flex: 1; font-size: 40px; font-weight: 800; padding: 16px 0; background: var(--card);
+    border: 3px solid var(--line); color: var(--ink); }
+  #after { display: flex; gap: 12px; width: 100%; }
+  #after .big { flex: 2; }
+  #after .sec { flex: 1; font-size: 16px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 4px; text-align: center; }
+  .verdict { font-size: 20px; font-weight: 700; }
+  #log { font-size: 13px; max-height: 260px; overflow: auto; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
+  .warn { background: #fff1e0; border-color: #f0c99a; }
+</style>
+</head>
+<body>
+<main>
+
+<!-- はじめの画面（親が操作する） -->
+<section id="home">
+  <h1>たしざん ― 音声の試作</h1>
+  <div class="card warn" id="nosupport" hidden><p>この端末のブラウザは音声認識に対応していません。Android の Chrome で開いてください。</p></div>
+  <div class="card warn" id="offline" hidden><p>インターネットにつながっていません。音声認識はつながっているときだけ使えます。</p></div>
+  <div class="card">
+    <p><b>聞き取りテスト</b>（1回9問・数は2〜10）。画面の数を子どもが声で言い、アプリが聞き取れたかを数えます。<br>
+    「そのまま」と「〜こ を付けて」を<b>それぞれ2回ずつ</b>（2日に分けてOK）やってください。</p>
+    <div class="row" style="margin-top:12px">
+      <button class="big" data-start="plain">そのまま言う</button>
+      <button class="big" data-start="ko">「〜こ」を付けて言う</button>
+    </div>
+  </div>
+  <div class="card">
+    <p><b>れんしゅう</b>（たしざん5問・答え5まで）。読み上げ → 自動で聞き取り → 正解判定の流れを試します。</p>
+    <div class="row" style="margin-top:12px"><button class="big" data-start="practice">れんしゅうを はじめる</button></div>
+  </div>
+  <div class="card">
+    <div class="row"><button class="sec" id="toResults">テストの結果を見る</button></div>
+    <p class="small" style="margin-top:12px">初めて使うときにマイクの許可を聞かれたら「<b>アプリの使用中のみ許可</b>」（または「常に許可」）を選んでください。「今回のみ」だと毎回聞かれます。<br>
+    数は「よん」「なな」と読むように教えてください（「し」「しち」は聞き違えやすいため）。<br>
+    声は Google の音声認識に送られます。記録はこの端末の中だけに残り、どこにも送りません。</p>
+  </div>
+</section>
+
+<!-- 問題の画面 -->
+<section id="play" hidden>
+  <div id="prog"><span id="progText"></span><button class="sec" id="quit" style="padding:6px 14px;font-size:15px">やめる</button></div>
+  <div id="q"></div>
+  <div id="frames"></div>
+  <div id="mic" aria-hidden="true">🎤</div>
+  <div id="say"></div>
+  <div id="heard"></div>
+  <div id="choices" hidden></div>
+  <div id="after" hidden>
+    <button class="sec" id="exclude">いいまちがい<br><span class="small">集計から外す</span></button>
+    <button class="big" id="next">つぎへ</button>
+  </div>
+</section>
+
+<!-- 結果の画面（親が見る） -->
+<section id="results" hidden>
+  <h1>聞き取りテストの結果</h1>
+  <div class="card" id="summary"></div>
+  <div class="card"><b>数ごとの正解 / 回数</b><div id="byNum" style="margin-top:8px"></div></div>
+  <div class="card"><b>聞き取った文字の記録</b>（新しい順）<div id="log" style="margin-top:8px"></div></div>
+  <div class="row">
+    <button class="sec" id="copy">結果をコピー</button>
+    <button class="sec" id="back">もどる</button>
+  </div>
+  <div class="row"><button class="sec" id="reset" style="color:#a33">記録をぜんぶ消す</button></div>
+</section>
+
+</main>
+
+<script src="numparse.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const KEY = "tashizan.proto.v1";
+const READ = ["ぜろ","いち","に","さん","よん","ご","ろく","なな","はち","きゅう","じゅう"];
+const FRUITS = ["🍎","🍊","🍓","🍇","🍑","🍌"];
+const ANIMALS = ["🐶","🐱","🐰","🐻","🐼","🐸"];
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+/* ---------- 記録（端末内だけ） ---------- */
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || { trials: [] }; } catch (e) { return { trials: [] }; } }
+function save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+/* ---------- 読み上げ ---------- */
+let voice = null, utter = null;  // utter は変数に持っておく（途中で消されて onend が来ない不具合の対策）
+function pickVoice() {
+  const vs = speechSynthesis.getVoices().filter(v => /^ja/i.test(v.lang));
+  voice = vs.find(v => /google/i.test(v.name)) || vs[0] || null;
+}
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.addEventListener("voiceschanged", pickVoice); }
+
+function speak(text) {
+  return new Promise(resolve => {
+    if (!("speechSynthesis" in window)) return resolve();
+    let done = false;
+    const fin = () => { if (!done) { done = true; clearTimeout(timer); resolve(); } };
+    speechSynthesis.cancel();
+    utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "ja-JP"; utter.rate = 0.9; utter.pitch = 1.1;
+    if (voice) utter.voice = voice;
+    utter.onend = fin; utter.onerror = fin;
+    const timer = setTimeout(fin, text.length * 300 + 2000);  // onend が来ないとき
+    speechSynthesis.speak(utter);
+  });
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- 聞き取り ---------- */
+let rec = null;
+function listenOnce() {
+  return new Promise(resolve => {
+    let done = false;
+    const fin = r => { if (!done) { done = true; clearTimeout(timer); $("mic").classList.remove("on"); resolve(r); } };
+    rec = new SR();
+    rec.lang = "ja-JP"; rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 5;
+    rec.onaudiostart = () => $("mic").classList.add("on");
+    rec.onresult = e => {
+      const alts = [];
+      const r0 = e.results[0];
+      for (let i = 0; i < r0.length; i++) alts.push({ t: r0[i].transcript, c: Math.round((r0[i].confidence || 0) * 100) / 100 });
+      fin({ type: "result", alts });
+    };
+    rec.onerror = e => fin({ type: "error", error: e.error });
+    rec.onend = () => fin({ type: "error", error: "no-result" });
+    const timer = setTimeout(() => { try { rec.abort(); } catch (e) {} fin({ type: "error", error: "timeout" }); }, 12000);
+    try { rec.start(); } catch (e) { fin({ type: "error", error: "start-failed" }); }
+  });
+}
+function stopListening() { try { rec && rec.abort(); } catch (e) {} }
+
+/* 1回分：無反応なら1回だけ自動で聞き直す */
+async function listen() {
+  let r = await listenOnce();
+  if (r.type === "error" && (r.error === "no-speech" || r.error === "no-result") && running) {
+    $("say").textContent = "もういちど いってね";
+    await speak("もういちど いってね");
+    await wait(300);
+    if (running) r = await listenOnce();
+  }
+  return r;
+}
+
+/* 候補の文字列 → 数の集合 */
+function numbersOf(alts) {
+  const all = new Set();
+  alts.forEach(a => NumParse.parseNumber(a.t).forEach(n => all.add(n)));
+  return all;
+}
+
+/* ---------- 絵（十の枠） ---------- */
+function drawFrames(a, b) {
+  const box = $("frames"); box.innerHTML = "";
+  const e1 = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+  const e2 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  const total = a + b, cells = [];
+  for (let f = 0; f < Math.max(1, Math.ceil(total / 10)); f++) {
+    const fr = document.createElement("div"); fr.className = "frame";
+    for (let i = 0; i < 10; i++) {
+      const k = f * 10 + i, s = document.createElement("span");
+      s.textContent = k < a ? e1 : k < total ? e2 : "";
+      fr.appendChild(s); cells.push(s);
+    }
+    box.appendChild(fr);
+  }
+  return cells;
+}
+
+/* ---------- 画面の切り替え ---------- */
+let running = false;
+function show(id) { ["home", "play", "results"].forEach(s => $(s).hidden = s !== id); }
+function goHome() { running = false; stopListening(); if ("speechSynthesis" in window) speechSynthesis.cancel(); show("home"); checkEnv(); }
+function checkEnv() { $("nosupport").hidden = !!SR; $("offline").hidden = navigator.onLine; }
+addEventListener("online", checkEnv); addEventListener("offline", checkEnv);
+checkEnv();
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function waitClick(...ids) {
+  return new Promise(res => {
+    const hs = ids.map(id => { const h = () => { hs.forEach(([i, f]) => $(i).removeEventListener("click", f)); res(id); }; $(id).addEventListener("click", h); return [id, h]; });
+  });
+}
+
+/* ---------- 聞き取りテスト ---------- */
+async function runTest(mode) {
+  if (!SR) return;
+  running = true; show("play");
+  const targets = shuffle([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  $("choices").hidden = true;
+  for (let i = 0; i < targets.length && running; i++) {
+    const n = targets[i];
+    $("progText").textContent = `テスト（${mode === "ko" ? "〜こ" : "そのまま"}） ${i + 1} / ${targets.length}`;
+    $("q").textContent = n;
+    drawFrames(n, 0);
+    $("say").textContent = ""; $("heard").textContent = ""; $("after").hidden = true;
+    await speak(mode === "ko" ? "いくつ あるかな。こ を つけて いってね" : "この かず、なんて いう？");
+    await wait(300);
+    if (!running) break;
+    const t0 = Date.now();
+    const r = await listen();
+    if (!running) break;
+    let outcome, nums = [];
+    if (r.type === "result") {
+      const set = numbersOf(r.alts); nums = [...set];
+      outcome = set.has(n) ? "ok" : set.size ? "wrong" : "other";
+    } else outcome = r.error === "no-speech" || r.error === "no-result" || r.error === "timeout" ? "silent" : "error:" + r.error;
+    const trial = { at: new Date().toISOString(), mode, target: n, outcome, nums, alts: r.alts || [], error: r.error || null, ms: Date.now() - t0, excluded: false };
+    const d = load(); d.trials.push(trial); save(d);
+
+    $("heard").textContent = r.alts ? "聞き取り：" + r.alts.map(a => a.t).join(" / ") : "（" + (r.error || "") + "）";
+    $("say").textContent = outcome === "ok" ? `「${n}」 きこえたよ！` : nums.length ? `「${nums[0]}」 って きこえたよ` : "うまく きこえなかったよ";
+    if (outcome === "ok") speak("きこえたよ");
+    $("after").hidden = false;
+    $("exclude").disabled = false;
+    let b;
+    while ((b = await waitClick("next", "exclude")) === "exclude") {
+      const d2 = load(); const last = d2.trials[d2.trials.length - 1];
+      if (last && last.at === trial.at) { last.excluded = true; save(d2); }
+      $("exclude").disabled = true; $("say").textContent = "集計から外しました";
+    }
+  }
+  if (running) { running = false; await speak("おしまい。よく がんばったね"); showResults(); }
+}
+
+/* ---------- れんしゅう（答え5まで・5問） ---------- */
+async function runPractice() {
+  running = true; show("play");
+  const qs = [];
+  while (qs.length < 5) {
+    const a = 1 + Math.floor(Math.random() * 4), b = 1 + Math.floor(Math.random() * (5 - a));
+    if (!qs.some(q => q[0] === a && q[1] === b)) qs.push([a, b]);
+  }
+  for (let i = 0; i < qs.length && running; i++) {
+    const [a, b] = qs[i], ans = a + b;
+    $("progText").textContent = `れんしゅう ${i + 1} / ${qs.length}`;
+    $("q").textContent = `${a} + ${b}`;
+    const cells = drawFrames(a, b);
+    $("after").hidden = true; $("heard").textContent = "";
+    const opts = shuffle([...new Set([ans, Math.max(1, ans - 1), ans + 1])]);
+    if (opts.length < 3) opts.push(ans + 2);
+    let miss = 0, solved = false;
+    while (!solved && running) {
+      $("say").textContent = "";
+      await speak(`${READ[a]} たす ${READ[b]} は？`);
+      await wait(300);
+      if (!running) break;
+      let got = null;  // 子が答えた数（ボタンでも声でも）
+      if (SR && navigator.onLine) {
+        $("choices").hidden = true;
+        const r = await listen();
+        if (!running) break;
+        if (r.type === "result") {
+          const set = numbersOf(r.alts);
+          $("heard").textContent = "聞き取り：" + r.alts.map(x => x.t).join(" / ");
+          if (set.has(ans)) got = ans; else if (set.size) got = [...set][0];
+        } else if (r.error === "network" || r.error === "service-not-allowed") {
+          $("say").textContent = "ボタンで こたえてね";
+        }
+      }
+      if (got === null) {  // 聞き取れない・通信なし → ボタンで
+        if (!$("say").textContent) $("say").textContent = "ボタンでも こたえられるよ";
+        got = await askButtons(opts);
+        if (!running) break;
+      }
+      $("say").textContent = `「${got}」`;
+      if (got === ans) {
+        solved = true; $("say").textContent = `${ans}！ せいかい！`;
+        await speak(`${READ[ans]}。せいかい！`);
+      } else if (++miss === 1) {
+        $("say").textContent = "もういっかい かんがえよう";
+        await speak("もういっかい かんがえよう");
+      } else {
+        $("say").textContent = "いっしょに かぞえよう";
+        await speak("いっしょに かぞえよう");
+        for (let k = 0; k < ans && running; k++) { cells[k].classList.add("lit"); await speak(READ[k + 1]); }
+        cells.forEach(c => c.classList.remove("lit"));
+        solved = true;
+        $("say").textContent = `${ans} だね`; await speak(`${READ[ans]} だね`);
+      }
+      $("choices").hidden = true;
+    }
+    await wait(500);
+  }
+  if (running) { running = false; await speak("おしまい。よく がんばったね"); goHome(); }
+}
+function askButtons(opts) {
+  return new Promise(res => {
+    const box = $("choices"); box.innerHTML = ""; box.hidden = false;
+    const stop = setInterval(() => { if (!running) { clearInterval(stop); res(null); } }, 300);
+    opts.forEach(n => { const b = document.createElement("button"); b.textContent = n; b.onclick = () => { clearInterval(stop); box.hidden = true; res(n); }; box.appendChild(b); });
+  });
+}
+
+/* ---------- 結果 ---------- */
+const LABEL = { ok: "正解", wrong: "違う数", other: "数以外", silent: "無反応" };
+function summarize() {
+  const d = load(), out = {};
+  for (const mode of ["plain", "ko"]) {
+    const ts = d.trials.filter(t => t.mode === mode && !t.excluded);
+    const c = { ok: 0, wrong: 0, other: 0, silent: 0, error: 0 };
+    ts.forEach(t => (t.outcome in c ? c[t.outcome]++ : c.error++));
+    const n = ts.length, rate = n ? c.ok / n : 0;
+    const verdict = !n ? "まだ記録がありません" : rate >= 0.9 ? "音声が主でOK（90%以上）" : rate >= 0.75 ? "ボタン＋音声補助（75〜89%）" : "ボタンが主（75%未満）";
+    const byNum = {};
+    ts.forEach(t => { const b = byNum[t.target] = byNum[t.target] || [0, 0]; b[1]++; if (t.outcome === "ok") b[0]++; });
+    out[mode] = { n, c, rate, verdict, byNum, excluded: d.trials.filter(t => t.mode === mode && t.excluded).length };
+  }
+  return { out, trials: d.trials };
+}
+function showResults() {
+  show("results");
+  const { out, trials } = summarize();
+  const name = { plain: "そのまま", ko: "〜こ付き" };
+  $("summary").innerHTML = ["plain", "ko"].map(m => {
+    const s = out[m];
+    return `<p><b>${name[m]}</b>：${s.n}回（目標18回）中 正解 ${s.c.ok}（${Math.round(s.rate * 100)}%）` +
+      `　違う数 ${s.c.wrong}・数以外 ${s.c.other}・無反応 ${s.c.silent}・エラー ${s.c.error}・除外 ${s.excluded}</p>` +
+      `<p class="verdict" style="margin:4px 0 12px">${s.verdict}${s.n && s.n < 18 ? "（まだ途中）" : ""}</p>`;
+  }).join("");
+  let h = "<table><tr><th>数</th>" + [2,3,4,5,6,7,8,9,10].map(n => `<th>${n}</th>`).join("") + "</tr>";
+  for (const m of ["plain", "ko"]) h += `<tr><td>${name[m]}</td>` + [2,3,4,5,6,7,8,9,10].map(n => { const b = out[m].byNum[n]; return `<td>${b ? b[0] + "/" + b[1] : "-"}</td>`; }).join("") + "</tr>";
+  $("byNum").innerHTML = h + "</table>";
+  $("log").textContent = trials.slice().reverse().map(fmtTrial).join("\n") || "（なし）";
+}
+function fmtTrial(t) {
+  const d = new Date(t.at), ts = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${ts} ${t.mode === "ko" ? "こ" : "素"} 答${t.target} → ${LABEL[t.outcome] || t.outcome}${t.excluded ? "（除外）" : ""} ` +
+    (t.alts.length ? "[" + t.alts.map(a => a.t + (a.c ? "(" + a.c + ")" : "")).join(" | ") + "]" : "") + ` ${(t.ms / 1000).toFixed(1)}秒`;
+}
+
+/* ---------- ボタン ---------- */
+document.querySelectorAll("[data-start]").forEach(b => b.addEventListener("click", () => {
+  const m = b.dataset.start;
+  if (m === "practice") runPractice(); else runTest(m);
+}));
+$("quit").onclick = goHome;
+$("toResults").onclick = showResults;
+$("back").onclick = goHome;
+$("copy").onclick = async () => {
+  const { out, trials } = summarize();
+  const txt = ["たしざん 聞き取りテスト結果 " + new Date().toLocaleString("ja-JP"),
+    ...["plain", "ko"].map(m => `${m === "ko" ? "〜こ付き" : "そのまま"}: ${out[m].n}回 正解${out[m].c.ok} 違う数${out[m].c.wrong} 数以外${out[m].c.other} 無反応${out[m].c.silent} エラー${out[m].c.error} 除外${out[m].excluded} → ${out[m].verdict}`),
+    "", ...trials.map(fmtTrial)].join("\n");
+  try { await navigator.clipboard.writeText(txt); $("copy").textContent = "コピーしました"; }
+  catch (e) { $("log").textContent = txt; $("copy").textContent = "下の文字を長押しでコピー"; }
+  setTimeout(() => ($("copy").textContent = "結果をコピー"), 2500);
+};
+$("reset").onclick = () => { if (confirm("テストの記録をぜんぶ消します。よいですか？")) { save({ trials: [] }); showResults(); } };
+</script>
+</body>
+</html>

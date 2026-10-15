@@ -1,0 +1,3 @@
+# 改行は LF に固定
+* text=auto eol=lf
+*.png binary
