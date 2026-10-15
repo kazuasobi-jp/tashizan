@@ -14,7 +14,7 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-    font-family: "Noto Sans JP", system-ui, sans-serif; overscroll-behavior: none;
+    font-family: "Noto Sans JP", system-ui, sans-serif;
     -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   main { max-width: 720px; margin: 0 auto; padding: 16px; min-height: 100%;
     display: flex; flex-direction: column; gap: 16px; }
@@ -67,7 +67,7 @@
 
 <!-- はじめの画面（親が操作する） -->
 <section id="home">
-  <h1>たしざん ― 音声の試作</h1>
+  <h1>たしざん ― 音声の試作 <span class="small">版3</span></h1>
   <div class="card warn" id="nosupport" hidden><p>この端末のブラウザは音声認識に対応していません。Android の Chrome で開いてください。</p></div>
   <div class="card warn" id="offline" hidden><p>インターネットにつながっていません。音声認識はつながっているときだけ使えます。</p></div>
   <div class="card">
@@ -223,8 +223,15 @@ function drawFrames(a, b) {
 
 /* ---------- 画面の切り替え ---------- */
 let running = false;
-function show(id) { ["home", "play", "results"].forEach(s => $(s).hidden = s !== id); }
-function goHome() { running = false; stopListening(); if ("speechSynthesis" in window) speechSynthesis.cancel(); show("home"); checkEnv(); }
+function show(id) {
+  ["home", "play", "results"].forEach(s => $(s).hidden = s !== id);
+  if (id !== "home" && !(history.state && history.state.sub)) history.pushState({ sub: true }, "");
+}
+addEventListener("popstate", () => { if (!$("home").hidden) return; running = false; stopListening(); if ("speechSynthesis" in window) speechSynthesis.cancel(); show("home"); checkEnv(); });
+function goHome() {
+  if (history.state && history.state.sub) { history.back(); return; }  // popstate でホームに戻す
+  running = false; stopListening(); if ("speechSynthesis" in window) speechSynthesis.cancel(); show("home"); checkEnv();
+}
 function checkEnv() { $("nosupport").hidden = !!SR; $("offline").hidden = navigator.onLine; }
 addEventListener("online", checkEnv); addEventListener("offline", checkEnv);
 checkEnv();
