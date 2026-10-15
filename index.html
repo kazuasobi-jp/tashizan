@@ -67,12 +67,13 @@
 
 <!-- はじめの画面（親が操作する） -->
 <section id="home">
-  <h1>たしざん ― 音声の試作 <span class="small">版4</span></h1>
+  <h1>たしざん ― 音声の試作 <span class="small">版5</span></h1>
   <div class="card warn" id="nosupport" hidden><p>この端末のブラウザは音声認識に対応していません。Android の Chrome で開いてください。</p></div>
   <div class="card warn" id="offline" hidden><p>インターネットにつながっていません。音声認識はつながっているときだけ使えます。</p></div>
   <div class="card">
     <p><b>聞き取りテスト</b>（1回9問・数は2〜10）。画面の数を子どもが声で言い、アプリが聞き取れたかを数えます。<br>
-    「そのまま」と「〜こ を付けて」を<b>それぞれ2回ずつ</b>（2日に分けてOK）やってください。</p>
+    「そのまま」と「〜こ を付けて」を<b>それぞれ2回ずつ</b>（2日に分けてOK）やってください。<br>
+    🎤が光って「ピコッ」と鳴ってから、<b>ふつうの声</b>で言うよう伝えてください（大きすぎる声は聞き取れないことがあります）。</p>
     <div class="row" style="margin-top:12px">
       <button class="big" data-start="plain">そのまま言う</button>
       <button class="big" data-start="ko">「〜こ」を付けて言う</button>
@@ -162,14 +163,27 @@ function speak(text) {
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---------- 聞き取り ---------- */
+// マイクが開いた合図の音（端末の開始音は鳴らないので自前で鳴らす）。最初のタップで作る
+let actx = null;
+function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} }
+function ping() {
+  if (!actx) return;
+  try {
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(880, t); o.frequency.setValueAtTime(1320, t + 0.08);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.2);
+  } catch (e) {}
+}
 let rec = null;
 function listenOnce() {
   return new Promise(resolve => {
     let done = false;
-    const fin = r => { if (!done) { done = true; clearTimeout(timer); $("mic").classList.remove("on"); resolve(r); } };
+    const t0 = Date.now(); let lag = null;  // lag: start() からマイクが開くまで
+    const fin = r => { if (!done) { done = true; clearTimeout(timer); $("mic").classList.remove("on"); r.lag = lag; resolve(r); } };
     rec = new SR();
     rec.lang = "ja-JP"; rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 5;
-    rec.onaudiostart = () => $("mic").classList.add("on");
+    rec.onaudiostart = () => { lag = Date.now() - t0; $("mic").classList.add("on"); ping(); };
     rec.onresult = e => {
       const alts = [];
       const r0 = e.results[0];
@@ -255,7 +269,7 @@ async function runTest(mode) {
     $("q").textContent = n;
     drawFrames(n, 0);
     $("say").textContent = ""; $("heard").textContent = ""; $("after").hidden = true;
-    await speak(mode === "ko" ? "いくつ、あるかな？ 「こ」を、つけて、いってね。" : "この数、なんていう？");
+    await speak(mode === "ko" ? "「こ」を、つけてね。" : "なんていう？");
     await wait(300);
     if (!running) break;
     const t0 = Date.now();
@@ -266,7 +280,7 @@ async function runTest(mode) {
       const set = numbersOf(r.alts); nums = [...set];
       outcome = set.has(n) ? "ok" : set.size ? "wrong" : "other";
     } else outcome = r.error === "no-speech" || r.error === "no-result" || r.error === "timeout" ? "silent" : "error:" + r.error;
-    const trial = { at: new Date().toISOString(), mode, target: n, outcome, nums, alts: r.alts || [], error: r.error || null, ms: Date.now() - t0, excluded: false };
+    const trial = { at: new Date().toISOString(), mode, target: n, outcome, nums, alts: r.alts || [], error: r.error || null, ms: Date.now() - t0, lag: r.lag, excluded: false };
     const d = load(); d.trials.push(trial); save(d);
 
     $("heard").textContent = r.alts ? "聞き取り：" + r.alts.map(a => a.t).join(" / ") : "（" + (r.error || "") + "）";
@@ -387,12 +401,14 @@ function showResults() {
 function fmtTrial(t) {
   const d = new Date(t.at), ts = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
   return `${ts} ${t.mode === "ko" ? "こ" : "素"} 答${t.target} → ${LABEL[t.outcome] || t.outcome}${t.excluded ? "（除外）" : ""} ` +
-    (t.alts.length ? "[" + t.alts.map(a => a.t + (a.c ? "(" + a.c + ")" : "")).join(" | ") + "]" : "") + ` ${(t.ms / 1000).toFixed(1)}秒`;
+    (t.alts.length ? "[" + t.alts.map(a => a.t + (a.c ? "(" + a.c + ")" : "")).join(" | ") + "]" : "") + ` ${(t.ms / 1000).toFixed(1)}秒` +
+    (t.lag != null ? `（マイク${(t.lag / 1000).toFixed(1)}秒）` : "");
 }
 
 /* ---------- ボタン ---------- */
 document.querySelectorAll("[data-start]").forEach(b => b.addEventListener("click", () => {
   const m = b.dataset.start;
+  unlockAudio();
   if (m === "practice") runPractice(); else runTest(m);
 }));
 $("quit").onclick = goHome;
