@@ -83,9 +83,10 @@
     <div class="row" style="margin-top:12px"><button class="big" data-start="practice">れんしゅうを はじめる</button></div>
   </div>
   <div class="card">
-    <div class="row"><button class="sec" id="toResults">テストの結果を見る</button></div>
+    <div class="row"><button class="sec" id="toResults">テストの結果を見る</button><button class="sec" id="testVoice">読み上げを試す</button></div>
     <p class="small" style="margin-top:12px">初めて使うときにマイクの許可を聞かれたら「<b>アプリの使用中のみ許可</b>」（または「常に許可」）を選んでください。「今回のみ」だと毎回聞かれます。<br>
     数は「よん」「なな」と読むように教えてください（「し」「しち」は聞き違えやすいため）。<br>
+    <span id="voiceInfo"></span><br>
     声は Google の音声認識に送られます。記録はこの端末の中だけに残り、どこにも送りません。</p>
   </div>
 </section>
@@ -125,7 +126,6 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const KEY = "tashizan.proto.v1";
-const READ = ["ぜろ","いち","に","さん","よん","ご","ろく","なな","はち","きゅう","じゅう"];
 const FRUITS = ["🍎","🍊","🍓","🍇","🍑","🍌"];
 const ANIMALS = ["🐶","🐱","🐰","🐻","🐼","🐸"];
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -140,6 +140,8 @@ let voice = null, utter = null;  // utter は変数に持っておく（途中�
 function pickVoice() {
   const vs = speechSynthesis.getVoices().filter(v => /^ja/i.test(v.lang));
   voice = vs.find(v => /google/i.test(v.name)) || vs[0] || null;
+  const el = document.getElementById("voiceInfo");
+  if (el) el.textContent = voice ? `読み上げの声：${voice.name}（${voice.lang}）` : "読み上げの声：日本語の声が見つかりません（端末の設定で日本語の音声データを入れてください）";
 }
 if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.addEventListener("voiceschanged", pickVoice); }
 
@@ -187,7 +189,7 @@ async function listen() {
   let r = await listenOnce();
   if (r.type === "error" && (r.error === "no-speech" || r.error === "no-result") && running) {
     $("say").textContent = "もういちど いってね";
-    await speak("もういちど いってね");
+    await speak("もういちど、いってね。");
     await wait(300);
     if (running) r = await listenOnce();
   }
@@ -246,7 +248,7 @@ async function runTest(mode) {
     $("q").textContent = n;
     drawFrames(n, 0);
     $("say").textContent = ""; $("heard").textContent = ""; $("after").hidden = true;
-    await speak(mode === "ko" ? "いくつ あるかな。こ を つけて いってね" : "この かず、なんて いう？");
+    await speak(mode === "ko" ? "いくつ、あるかな？ 「こ」を、つけて、いってね。" : "この数、なんていう？");
     await wait(300);
     if (!running) break;
     const t0 = Date.now();
@@ -262,7 +264,7 @@ async function runTest(mode) {
 
     $("heard").textContent = r.alts ? "聞き取り：" + r.alts.map(a => a.t).join(" / ") : "（" + (r.error || "") + "）";
     $("say").textContent = outcome === "ok" ? `「${n}」 きこえたよ！` : nums.length ? `「${nums[0]}」 って きこえたよ` : "うまく きこえなかったよ";
-    if (outcome === "ok") speak("きこえたよ");
+    if (outcome === "ok") speak("きこえたよ！");
     $("after").hidden = false;
     $("exclude").disabled = false;
     let b;
@@ -272,7 +274,7 @@ async function runTest(mode) {
       $("exclude").disabled = true; $("say").textContent = "集計から外しました";
     }
   }
-  if (running) { running = false; await speak("おしまい。よく がんばったね"); showResults(); }
+  if (running) { running = false; await speak("おしまい。よく、がんばったね！"); showResults(); }
 }
 
 /* ---------- れんしゅう（答え5まで・5問） ---------- */
@@ -294,7 +296,7 @@ async function runPractice() {
     let miss = 0, solved = false;
     while (!solved && running) {
       $("say").textContent = "";
-      await speak(`${READ[a]} たす ${READ[b]} は？`);
+      await speak(`${a}たす${b}は？`);
       await wait(300);
       if (!running) break;
       let got = null;  // 子が答えた数（ボタンでも声でも）
@@ -318,23 +320,23 @@ async function runPractice() {
       $("say").textContent = `「${got}」`;
       if (got === ans) {
         solved = true; $("say").textContent = `${ans}！ せいかい！`;
-        await speak(`${READ[ans]}。せいかい！`);
+        await speak(`${ans}。せいかい！`);
       } else if (++miss === 1) {
         $("say").textContent = "もういっかい かんがえよう";
-        await speak("もういっかい かんがえよう");
+        await speak("もういっかい、かんがえよう。");
       } else {
         $("say").textContent = "いっしょに かぞえよう";
-        await speak("いっしょに かぞえよう");
-        for (let k = 0; k < ans && running; k++) { cells[k].classList.add("lit"); await speak(READ[k + 1]); }
+        await speak("いっしょに、かぞえよう。");
+        for (let k = 0; k < ans && running; k++) { cells[k].classList.add("lit"); await speak(String(k + 1)); }
         cells.forEach(c => c.classList.remove("lit"));
         solved = true;
-        $("say").textContent = `${ans} だね`; await speak(`${READ[ans]} だね`);
+        $("say").textContent = `${ans} だね`; await speak(`${ans}、だね。`);
       }
       $("choices").hidden = true;
     }
     await wait(500);
   }
-  if (running) { running = false; await speak("おしまい。よく がんばったね"); goHome(); }
+  if (running) { running = false; await speak("おしまい。よく、がんばったね！"); goHome(); }
 }
 function askButtons(opts) {
   return new Promise(res => {
@@ -388,6 +390,7 @@ document.querySelectorAll("[data-start]").forEach(b => b.addEventListener("click
 }));
 $("quit").onclick = goHome;
 $("toResults").onclick = showResults;
+$("testVoice").onclick = () => { pickVoice(); speak("3たす4は？ 7。せいかい！ よく、がんばったね！"); };
 $("back").onclick = goHome;
 $("copy").onclick = async () => {
   const { out, trials } = summarize();
