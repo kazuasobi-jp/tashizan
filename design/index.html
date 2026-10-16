@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f7f3ee">
+<title>デザイン案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<!-- 本体（Step 2）ではフォントを使う字だけに絞って同梱する（オフラインでも同じ形になるように。OFL） -->
+<style>
+  /* ---------- 3案の色 ----------
+     --ca/--cb：足される数・足す数の色（数字と十の枠の玉を同じ色に）。赤みと青みで、色覚の型によらず区別しやすい組み合わせ */
+  :root, [data-theme="a"] {   /* いちご：あたたかい紙の色 */
+    --bg: #fff6ec; --card: #ffffff; --ink: #3a2e2a; --sub: #7a6a62; --line: #f1dcc8;
+    --num: #3a2e2a; --ca: #d23c48; --cb: #2f6fd0; --accent: #d23c48; --accent-ink: #fff;
+    --mic: #d23c48; --mic-edge: #d23c48; --cell: #fffaf4; --frame: #c8844d;
+    --lit: #ffe08a; --lit-edge: #c2410c; --qbox: #fde3e1; --qedge: #c93a45;
+  }
+  [data-theme="b"] {          /* うみ：すっきりした水色 */
+    --bg: #e4f5fa; --card: #ffffff; --ink: #183a4d; --sub: #4f6f80; --line: #bfe2ee;
+    --num: #135f86; --ca: #e0533d; --cb: #1f6fae; --accent: #1f7fae; --accent-ink: #fff;
+    --mic: #ffb066; --mic-edge: #d35f00; --cell: #f2fbfe; --frame: #2f93bb;
+    --lit: #ffe08a; --lit-edge: #c2410c; --qbox: #fff2d9; --qedge: #b86e00;
+  }
+  [data-theme="c"] {          /* ほし：夜空 */
+    --bg: #1b2347; --card: #263160; --ink: #fff8e6; --sub: #b9c0e0; --line: #4a5694;
+    --num: #ffd54a; --ca: #ffd54a; --cb: #7ee0ff; --accent: #ffd54a; --accent-ink: #1b2347;
+    --mic: #7ee0ff; --mic-edge: #7ee0ff; --cell: #2b3770; --frame: #7380c8;
+    --lit: #3f51b5; --lit-edge: #ffd54a; --qbox: #33407a; --qedge: #ffd54a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif; font-weight: 500;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none; touch-action: pan-y; }   /* 引っ張って再読み込み・2本指の拡大を止める */
+  button { font: inherit; border: 0; cursor: pointer; touch-action: manipulation; color: inherit; }
+  [hidden] { display: none !important; }
+  main { max-width: 560px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  section { flex: 1; display: flex; flex-direction: column; }
+  .credit { font-size: 12px; color: var(--sub); text-align: center; margin-top: 12px; }
+
+  /* ---------- えらぶ画面 ---------- */
+  body[data-screen="pick"] { background: #f7f3ee; }
+  #pick { gap: 14px; }
+  #pick h1 { font-size: 20px; margin: 4px 0 0; color: #3a2e2a; }
+  #pick .note { font-size: 14px; line-height: 1.6; color: #6b5f58; margin: 0; }
+  .tile { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 24px; text-align: left; box-shadow: 0 4px 0 rgba(0,0,0,.12); }
+  .tile:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+  .tile .pic { font-size: 44px; width: 76px; height: 76px; border-radius: 20px; display: grid; place-items: center; flex: none; }
+  .tile b { font-size: 32px; font-weight: 800; display: block; }
+  .tile small { font-size: 14px; opacity: .85; }
+  .tile[data-go="a"] { background: #fff; color: #3a2e2a; border: 3px solid #f1dcc8; } .tile[data-go="a"] .pic { background: #fde3e1; }
+  .tile[data-go="b"] { background: #e4f5fa; color: #183a4d; border: 3px solid #bfe2ee; } .tile[data-go="b"] .pic { background: #fff; }
+  .tile[data-go="c"] { background: #1b2347; color: #fff8e6; border: 3px solid #3a4680; } .tile[data-go="c"] .pic { background: #263160; }
+
+  /* ---------- 親の歯車（3秒長押しで えらぶ画面へ） ---------- */
+  #gear { position: fixed; top: max(10px, env(safe-area-inset-top)); right: 10px; width: 40px; height: 40px; z-index: 8;
+    border-radius: 50%; background: transparent; font-size: 20px; opacity: .35; filter: grayscale(1); }
+  #gear.hold { opacity: 1; animation: spin 3s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- はじめる画面 ---------- */
+  #start { align-items: center; justify-content: center; gap: 24px; text-align: center; }
+  #start .hero { font-size: 96px; line-height: 1; }
+  #start h2 { font-size: 40px; font-weight: 800; margin: 0; color: var(--num); }
+  .go { background: var(--accent); color: var(--accent-ink); font-size: 34px; font-weight: 800;
+    padding: 20px 56px; border-radius: 999px; box-shadow: 0 6px 0 rgba(0,0,0,.18); }
+  .go:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+  .go:disabled { opacity: .5; }
+
+  /* ---------- 問題の画面 ---------- */
+  #play { gap: 16px; align-items: center; }
+  #prog { display: flex; justify-content: center; gap: 10px; font-size: 30px; min-height: 44px; align-items: center; }
+  #prog span { width: 40px; height: 40px; display: grid; place-items: center; }
+  #prog span.todo { filter: grayscale(1); opacity: .3; }
+  #prog span.new { animation: pop .5s ease-out; }
+
+  #eq { display: flex; align-items: center; justify-content: center; gap: .18em; font-size: clamp(60px, 19vw, 104px);
+    font-weight: 800; line-height: 1; color: var(--num); }
+  #eq .op { color: var(--sub); font-size: .7em; }
+  #qa { color: var(--ca); } #qb { color: var(--cb); }
+  #ans { min-width: 1.15em; height: 1.2em; display: grid; place-items: center; border-radius: .22em; background: var(--qbox);
+    border: 3px dashed var(--qedge); color: var(--sub); }
+  #ans.got { color: var(--num); border-style: solid; animation: pop .45s ease-out; }
+  @keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+  /* 十の枠：2段×5。玉は同じ形で色だけ違う（算数ブロックと同じ考え方） */
+  .frame { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: min(100%, 420px); padding: 8px;
+    background: var(--frame); border-radius: 16px; }
+  .frame span { aspect-ratio: 1; display: grid; place-items: center; background: var(--cell); border-radius: 10px;
+    border: 3px solid transparent; transition: transform .2s, background .2s; }
+  .frame span.lit { background: var(--lit); border-color: var(--lit-edge); transform: scale(1.1); }
+  .tok { width: 70%; aspect-ratio: 1; border-radius: 50%; background: var(--ca); box-shadow: inset 0 -5px 0 rgba(0,0,0,.18), inset 0 4px 0 rgba(255,255,255,.35); }
+  .tok.b { background: var(--cb); }
+
+  /* マイク：読み上げ中は🔊でゆれる → 聞いている間は🎤を色で塗って大きく、波紋 → 声が届いたら波紋を止める */
+  #mic { position: relative; width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center; font-size: 54px;
+    background: var(--card); border: 4px solid var(--line); opacity: .45; transition: transform .2s, background .2s, border-color .2s, opacity .2s; }
+  #mic .badge { display: none; }
+  #mic.speak { opacity: 1; animation: bob .7s ease-in-out infinite; }
+  #mic.on, #mic.heard { opacity: 1; background: var(--mic); border-color: var(--mic-edge); transform: scale(1.15); }
+  #mic::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 6px solid var(--mic-edge); opacity: 0; pointer-events: none; }
+  #mic.on::after { animation: ripple 1.3s ease-out infinite; }
+  @keyframes ripple { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.5); opacity: 0; } }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  #say { font-size: 26px; font-weight: 800; min-height: 1.4em; text-align: center; }
+
+  #choices { display: flex; gap: 14px; width: 100%; justify-content: center; }
+  #choices button { width: min(30%, 120px); aspect-ratio: 1; font-size: 52px; font-weight: 700; border-radius: 24px;
+    background: var(--card); border: 3px solid var(--frame); color: var(--num); box-shadow: 0 5px 0 var(--frame); }
+  #choices button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--frame); }
+
+  /* --- 案A いちご：数式 → 枠 → マイク --- */
+  [data-theme="a"] .frame span { border-radius: 50%; }
+
+  /* --- 案B うみ：枠 → 吹き出し（数式）→ くじら（くじらが問題を出して、聞いてくれる） --- */
+  [data-theme="b"] .frame { order: 1; border-radius: 24px; } [data-theme="b"] .frame span { border-radius: 50%; }
+  [data-theme="b"] #eq { order: 2; margin-top: 4px; background: var(--card); padding: 14px 22px; border-radius: 32px; position: relative; box-shadow: 0 4px 0 var(--line); }
+  [data-theme="b"] #eq::after { content: ""; position: absolute; left: 50%; bottom: -18px; margin-left: -14px;
+    border: 14px solid transparent; border-top-color: var(--card); border-bottom: 0; }
+  [data-theme="b"] #mic { order: 3; width: 124px; height: 124px; font-size: 80px; background: transparent; border-color: transparent; opacity: .7; margin-top: 4px; }
+  [data-theme="b"] #mic.on, [data-theme="b"] #mic.heard { background: #ffe2c4; border-color: var(--mic-edge); }
+  [data-theme="b"] #mic .badge { display: grid; place-items: center; position: absolute; right: -6px; bottom: -2px; width: 46px; height: 46px;
+    border-radius: 50%; background: #fff; border: 3px solid var(--line); font-size: 26px; }
+  [data-theme="b"] #mic.on .badge, [data-theme="b"] #mic.heard .badge { background: var(--mic-edge); border-color: var(--mic-edge); }
+  [data-theme="b"] #say { order: 4; } [data-theme="b"] #choices { order: 5; }
+
+  /* --- 案C ほし：大きな黄色い数字、マイクは光る輪、ボタンは丸 --- */
+  [data-theme="c"] .frame { background: transparent; border: 3px solid var(--frame); }
+  [data-theme="c"] .frame span { border-radius: 8px; }
+  [data-theme="c"] #mic { width: 124px; height: 124px; background: transparent; border-color: var(--frame); opacity: .8; }
+  [data-theme="c"] #mic.on, [data-theme="c"] #mic.heard { background: rgba(126,224,255,.18); border-color: var(--mic); box-shadow: 0 0 24px rgba(126,224,255,.8); }
+  [data-theme="c"] #choices button { border-radius: 50%; box-shadow: none; }
+  [data-theme="c"] #eq { text-shadow: 0 0 18px rgba(255,213,74,.35); }
+
+  /* タブレット横置き：左に数式と枠、右にマイクとボタン */
+  @media (orientation: landscape) and (min-width: 700px) {
+    main { max-width: 1000px; }
+    #play { display: grid; grid-template-columns: 1.2fr 1fr; grid-auto-flow: dense; column-gap: 32px; align-content: center; justify-items: center; }
+    #prog { grid-column: 1 / -1; }
+    #eq, .frame { grid-column: 1; }
+    #mic, #say, #choices { grid-column: 2; }
+    #mic { grid-row: 2; align-self: end; } #say { grid-row: 3; } #choices { grid-row: 4; }
+  }
+
+  /* ---------- 正解の演出 ---------- */
+  #fx { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  .bubble { position: absolute; bottom: -60px; border-radius: 50%; border: 3px solid rgba(31,127,174,.55);
+    background: radial-gradient(circle at 30% 30%, #fff, rgba(191,226,238,.4)); animation: rise 1.4s ease-in forwards; }
+  @keyframes rise { to { transform: translateY(-70vh); opacity: 0; } }
+  .spark { position: absolute; font-size: 32px; animation: burst 1.1s ease-out forwards; }
+  @keyframes burst { 0% { transform: translate(0,0) scale(.3); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 0; } }
+  .hanamaru { position: absolute; width: 176px; height: 176px; margin: -88px 0 0 -88px; }
+  .hanamaru path { fill: none; stroke: #d23c48; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: var(--len); stroke-dashoffset: var(--len); animation: draw .8s ease-out forwards; }
+  .hanamaru path.petal { animation-delay: .45s; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  /* ---------- シール ---------- */
+  #sheet { align-items: center; gap: 18px; text-align: center; }
+  #sheet h2 { font-size: 30px; font-weight: 800; margin: 8px 0 0; color: var(--num); }
+  .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 480px; padding: 16px;
+    background: var(--card); border-radius: 24px; border: 3px solid var(--line); }
+  .board span { aspect-ratio: 1; border-radius: 50%; border: 3px dashed var(--frame); display: grid; place-items: center; font-size: clamp(28px, 9vw, 46px); }
+  .board span.on { border: 4px solid #fff; background: var(--qbox); box-shadow: 0 3px 6px rgba(0,0,0,.18); }
+  #giftSpot { height: 200px; display: grid; place-items: center; }
+  #gift { width: 180px; height: 180px; z-index: 6; border-radius: 50%; position: relative;
+    background: var(--qbox); border: 8px solid #fff; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 110px; display: grid; place-items: center;
+    animation: giftIn .7s cubic-bezier(.3,1.6,.5,1) both, wiggle 1.6s .8s ease-in-out infinite; transition: transform .6s ease-in, opacity .6s; }
+  @keyframes giftIn { 0% { transform: scale(.2) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes wiggle { 0%, 100% { rotate: 0deg; } 25% { rotate: -6deg; } 75% { rotate: 6deg; } }
+  #gift.fly { animation: none; }
+  #sheet .hint { font-size: 22px; font-weight: 800; color: var(--sub); min-height: 1.4em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+  }
+</style>
+</head>
+<body data-screen="pick">
+<button id="gear" aria-label="おとなのボタン（3秒おす）" hidden>⚙️</button>
+<main>
+
+<!-- えらぶ画面（親と子で見る） -->
+<section id="pick">
+  <h1>どれが いい？</h1>
+  <p class="note">デザイン案です。それぞれ「はじめる」で3問ためせます（声で答える。聞き取れないときはボタン）。途中でやめるときは右上の⚙️を3秒おしてください（Android の戻る操作でも戻れます）。</p>
+  <button class="tile" data-go="a"><span class="pic">🍓</span><span><b>いちご</b><small>あたたかい色・はなまる</small></span></button>
+  <button class="tile" data-go="b"><span class="pic">🐳</span><span><b>うみ</b><small>くじらが もんだいを だして きいてくれる</small></span></button>
+  <button class="tile" data-go="c"><span class="pic">⭐</span><span><b>ほし</b><small>よぞら・きらきら</small></span></button>
+  <p class="credit">音声：VOICEVOX:冥鳴ひまり</p>
+</section>
+
+<!-- はじめる画面 -->
+<section id="start" hidden>
+  <div class="hero" id="hero"></div>
+  <h2 id="title"></h2>
+  <button class="go" id="go">はじめる</button>
+  <p class="credit">音声：VOICEVOX:冥鳴ひまり</p>
+</section>
+
+<!-- 問題の画面 -->
+<section id="play" hidden>
+  <div id="prog"></div>
+  <div id="eq"><span id="qa"></span><span class="op">+</span><span id="qb"></span><span class="op">=</span><span id="ans">?</span></div>
+  <div class="frame" id="frame"></div>
+  <div id="mic" aria-hidden="true"><span class="face"></span><span class="badge"></span></div>
+  <div id="say"></div>
+  <div id="choices" hidden></div>
+</section>
+
+<!-- シール台紙 -->
+<section id="sheet" hidden>
+  <h2>シールを どうぞ！</h2>
+  <div class="board" id="board"></div>
+  <div id="giftSpot"><div id="gift" hidden></div></div>
+  <div class="hint" id="hint"></div>
+  <button class="go" id="sheetEnd" hidden>おしまい</button>
+</section>
+
+<div id="fx"></div>
+</main>
+
+<script src="../numparse.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const THEMES = {
+  a: { name: "いちご", hero: "🍓", face: "🎤", prog: "🍓", color: "#fff6ec",
+       stickers: ["🌷", "🍒", "🎀", "🍰", "🌸", "🍑", "🧁", "🌼", "🍎", "🍓"] },
+  b: { name: "うみ", hero: "🐳", face: "🐳", prog: "🐚", color: "#e4f5fa",
+       stickers: ["🐠", "🐬", "🦀", "🐢", "🐙", "🐡", "🦭", "🐳", "🦑", "🐚"] },
+  c: { name: "ほし", hero: "🌟", face: "🎤", prog: "⭐", color: "#1b2347",
+       stickers: ["🚀", "🪐", "🌙", "☄️", "🛸", "🌈", "👽", "🌍", "✨", "🌟"] },
+};
+const QUESTIONS = [[2, 1], [1, 3], [2, 3]];
+let theme = "a", run = 0;  // run：画面を離れたら増やして、進行中の流れを止める
+
+/* ---------- 音 ---------- */
+let audio = null, audioDone = null, actx = null;
+function play(name) {
+  stopAudio();
+  return new Promise(res => {
+    const a = new Audio("../audio/" + name + ".wav");
+    audio = a; audioDone = res;
+    a.onended = a.onerror = () => { if (audio === a) { audio = audioDone = null; } res(); };
+    a.play().catch(() => res());
+  });
+}
+function stopAudio() {  // 止めたときも待っている側を終わらせる
+  if (audio) { try { audio.pause(); } catch (e) {} }
+  const r = audioDone; audio = audioDone = null; r && r();
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} }
+function ping() {  // マイクが開いた合図「ピコッ」
+  if (!actx) return;
+  try {
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(880, t); o.frequency.setValueAtTime(1320, t + 0.08);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.2);
+  } catch (e) {}
+}
+
+/* マイクの見た目：""＝待ち / speak＝読み上げ中 / on＝聞いている / heard＝声が届いた */
+function setMic(state) {
+  const m = $("mic"), T = THEMES[theme];
+  m.className = state;
+  const icon = state === "speak" ? "🔊" : "🎤";
+  if (theme === "b") { m.querySelector(".face").textContent = T.face; m.querySelector(".badge").textContent = icon; }
+  else m.querySelector(".face").textContent = icon;
+}
+async function say(name, my) { if (my !== run) return; setMic("speak"); await play(name); if (my === run) setMic(""); }
+
+/* ---------- 聞き取り（無反応は1回聞き直し→ボタン） ---------- */
+let rec = null;
+function listenOnce() {
+  return new Promise(resolve => {
+    let done = false;
+    const fin = r => { if (!done) { done = true; clearTimeout(timer); setMic(""); resolve(r); } };
+    rec = new SR();
+    rec.lang = "ja-JP"; rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 5;
+    rec.onaudiostart = () => { if (done) return; setMic("on"); ping(); };
+    rec.onspeechstart = () => { if (!done) setMic("heard"); };
+    rec.onresult = e => { const r0 = e.results[0], t = []; for (let i = 0; i < r0.length; i++) t.push(r0[i].transcript); fin({ type: "result", t }); };
+    rec.onerror = e => fin({ type: "error", error: e.error });
+    rec.onend = () => fin({ type: "error", error: "no-result" });
+    const timer = setTimeout(() => { try { rec.abort(); } catch (e) {} fin({ type: "error", error: "timeout" }); }, 12000);
+    try { rec.start(); } catch (e) { fin({ type: "error", error: "start-failed" }); }
+  });
+}
+function stopListening() { try { rec && rec.abort(); } catch (e) {} }
+
+function askButtons(opts) {
+  return new Promise(resolve => {
+    const box = $("choices"); box.innerHTML = ""; box.hidden = false; $("mic").hidden = true;  // ボタンの間は🎤を隠す
+    opts.forEach(n => { const b = document.createElement("button"); b.textContent = n;
+      b.onclick = () => { box.hidden = true; $("mic").hidden = false; resolve(n); }; box.appendChild(b); });
+  });
+}
+
+/* 子の答え（数）を1つ得る。声 → だめならボタン */
+async function getAnswer(ans, opts, my) {
+  if (SR && navigator.onLine) {
+    for (let tryNo = 0; tryNo < 2 && my === run; tryNo++) {
+      const r = await listenOnce();
+      if (my !== run) return null;
+      if (r.type === "result") {
+        const nums = []; r.t.forEach(t => NumParse.parseNumber(t).forEach(n => nums.push(n)));
+        if (nums.includes(ans)) return ans;
+        if (nums.length) return nums[nums.length - 1];  // 問題を言い直したときに頭の数を取らないよう、最後の数
+      }
+      if (r.type === "error" && (r.error === "network" || r.error === "not-allowed" || r.error === "service-not-allowed")) break;
+      if (tryNo === 0) { $("say").textContent = "もういちど いってね"; await say("p/mouichido", my); await wait(300); }
+    }
+    if (my !== run) return null;
+    $("say").textContent = "ボタンで こたえてね"; say("p/button", my);
+  }
+  return askButtons(opts);
+}
+
+/* ボタンの選択肢：答え＋よくある間違い（a・b そのもの、±1、±2）から2つ。小さい順に並べる */
+function makeOpts(a, b, ans) {
+  const near = [a, b, ans - 1, ans + 1].filter(n => n >= 0 && n <= 10 && n !== ans);
+  const far = [ans - 2, ans + 2].filter(n => n >= 0 && n <= 10 && n !== ans);
+  const pool = shuffle([...new Set(near)]).concat(shuffle(far)).filter((n, i, s) => s.indexOf(n) === i);
+  return [ans, pool[0], pool[1]].sort((x, y) => x - y);
+}
+
+/* ---------- 正解の演出（案ごと） ---------- */
+let fxTimer = null;
+function celebrate() {
+  const fx = $("fx"), box = $("ans").getBoundingClientRect();
+  const cx = Math.min(Math.max(box.left + box.width / 2, 100), innerWidth - 100), cy = box.top + box.height / 2;
+  clearTimeout(fxTimer); fx.innerHTML = "";
+  if (theme === "a") {  // はなまる
+    const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "-110 -110 220 220"); svg.setAttribute("class", "hanamaru");
+    svg.style.left = cx + "px"; svg.style.top = cy + "px";
+    let d = "";  // うずまき
+    for (let i = 0; i <= 100; i++) { const t = i / 100 * Math.PI * 4.2 - Math.PI / 2, r = 54 + 20 * i / 100;
+      d += (i ? "L" : "M") + (r * Math.cos(t)).toFixed(1) + " " + (r * Math.sin(t)).toFixed(1); }
+    let p = "";  // 花びら
+    const N = 10, R = 94, ar = (R * Math.sin(Math.PI / N) * 1.05).toFixed(1);
+    for (let i = 0; i <= N; i++) { const t = i / N * Math.PI * 2 - Math.PI / 2, x = (R * Math.cos(t)).toFixed(1), y = (R * Math.sin(t)).toFixed(1);
+      p += i ? `A${ar} ${ar} 0 0 1 ${x} ${y}` : `M${x} ${y}`; }
+    [[d, ""], [p, "petal"]].forEach(([dd, cls]) => { const el = document.createElementNS(ns, "path"); el.setAttribute("d", dd);
+      if (cls) el.setAttribute("class", cls); svg.appendChild(el); });
+    fx.appendChild(svg);
+    svg.querySelectorAll("path").forEach(el => el.style.setProperty("--len", Math.ceil(el.getTotalLength())));
+  } else if (theme === "b") {  // あわ（少なめ・短め）
+    for (let i = 0; i < 9; i++) { const s = document.createElement("div"), w = 20 + Math.random() * 40;
+      s.className = "bubble"; s.style.width = s.style.height = w + "px"; s.style.left = 5 + Math.random() * 90 + "vw";
+      s.style.animationDelay = Math.random() * .3 + "s"; fx.appendChild(s); }
+  } else {  // ほしが はじける
+    for (let i = 0; i < 12; i++) { const s = document.createElement("span"), a = i / 12 * Math.PI * 2, r = 100 + Math.random() * 60;
+      s.className = "spark"; s.textContent = i % 3 ? "⭐" : "✨"; s.style.left = cx - 16 + "px"; s.style.top = cy - 16 + "px";
+      s.style.setProperty("--dx", Math.cos(a) * r + "px"); s.style.setProperty("--dy", Math.sin(a) * r + "px"); fx.appendChild(s); }
+  }
+  fxTimer = setTimeout(() => { fx.innerHTML = ""; }, 2000);
+}
+
+/* ---------- 画面 ---------- */
+function show(id) {
+  ["pick", "start", "play", "sheet"].forEach(s => $(s).hidden = s !== id);
+  document.body.dataset.screen = id;
+  $("gear").hidden = id === "pick";
+  document.querySelector('meta[name="theme-color"]').content = id === "pick" ? "#f7f3ee" : THEMES[theme].color;
+  scrollTo(0, 0);
+}
+function stopAll() { run++; stopListening(); stopAudio(); clearTimeout(fxTimer); $("fx").innerHTML = ""; $("gift").hidden = true; }
+function goPick() { stopAll(); show("pick"); }
+function openTheme(t, push = true) {
+  theme = t; document.body.dataset.theme = t;
+  $("hero").textContent = THEMES[t].hero; $("title").textContent = THEMES[t].name; $("go").disabled = false;
+  if (push) history.pushState({ t }, "");
+  show("start");
+}
+addEventListener("popstate", () => { if (document.body.dataset.screen !== "pick") goPick(); });
+// ほかのアプリに移ったら止めて、はじめる画面に戻す（聞き取りが止まって「ボタンで」に進まないように）
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && document.body.dataset.screen === "play") { stopAll(); openTheme(theme, false); }
+});
+
+/* 歯車の3秒長押し */
+let gearTimer = null;
+const gearOff = () => { clearTimeout(gearTimer); $("gear").classList.remove("hold"); };
+$("gear").addEventListener("pointerdown", () => { $("gear").classList.add("hold"); gearTimer = setTimeout(() => { gearOff(); history.back(); }, 3000); });
+["pointerup", "pointerleave", "pointercancel"].forEach(ev => $("gear").addEventListener(ev, gearOff));
+
+function drawFrame(a, b) {
+  const fr = $("frame"); fr.innerHTML = ""; const cells = [];
+  for (let i = 0; i < 10; i++) { const s = document.createElement("span");
+    if (i < a + b) { const t = document.createElement("i"); t.className = i < a ? "tok" : "tok b"; s.appendChild(t); }
+    fr.appendChild(s); cells.push(s); }
+  return cells;
+}
+function drawProg(done, bump) {
+  const p = $("prog"); p.innerHTML = "";
+  QUESTIONS.forEach((_, i) => { const s = document.createElement("span"); s.textContent = THEMES[theme].prog;
+    s.className = i < done ? (bump && i === done - 1 ? "new" : "") : "todo"; p.appendChild(s); });
+}
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+async function runDemo() {
+  $("go").disabled = true;
+  stopAll(); const my = run;
+  unlockAudio(); show("play"); setMic(""); $("mic").hidden = false; $("choices").hidden = true;
+  drawProg(0); $("qa").textContent = ""; $("qb").textContent = ""; $("ans").textContent = "?"; $("ans").className = ""; $("frame").innerHTML = ""; $("say").textContent = "";
+  await say("p/hajimeru", my); await wait(300);
+  const queue = QUESTIONS.map(q => ({ q, again: false }));
+  let done = 0;
+  while (queue.length && my === run) {
+    const { q: [a, b], again } = queue.shift(), ans = a + b;
+    $("qa").textContent = a; $("qb").textContent = b; $("ans").textContent = "?"; $("ans").className = "";
+    const cells = drawFrame(a, b), opts = makeOpts(a, b, ans);
+    let miss = 0, solved = false;
+    while (!solved && my === run) {
+      $("say").textContent = "";
+      await say(`q/${a}_${b}`, my); await wait(300);
+      if (my !== run) return;
+      const t0 = Date.now(), got = await getAnswer(ans, opts, my), secs = (Date.now() - t0) / 1000;
+      if (my !== run) return;
+      if (got === ans) {
+        solved = true; $("ans").textContent = ans; $("ans").className = "got"; $("say").textContent = "せいかい！";
+        celebrate(); if (!again) drawProg(++done, true);
+        await say(`ok/${ans}`, my);
+        if (miss || secs > 5) await say("p/kangaeta", my);  // じっくり考えて正解したときは、やり方をほめる
+      } else if (++miss === 1) {
+        $("say").textContent = "もういっかい かんがえよう"; await say("p/kangaeyou", my);
+      } else {  // 2回目：一緒に数える → 子に言わせる → この回の最後にもう一度
+        $("say").textContent = "いっしょに かぞえよう"; await say("p/kazoeyou", my);
+        for (let k = 0; k < ans && my === run; k++) { cells[k].classList.add("lit"); await say(`n/${k + 1}`, my); }
+        await wait(400);
+        $("say").textContent = "こたえは いくつかな？"; await say("p/iete", my); await wait(300);
+        if (my !== run) return;
+        await getAnswer(ans, opts, my);  // 何と言っても受け取る
+        if (my !== run) return;
+        cells.forEach(c => c.classList.remove("lit"));
+        solved = true; $("ans").textContent = ans; $("ans").className = "got"; $("say").textContent = "";
+        if (!again) drawProg(++done, true);
+        await say("p/kazoeta", my);
+        if (!again) queue.push({ q: [a, b], again: true });
+      }
+    }
+    await wait(700);
+  }
+  if (my !== run) return;
+  await say("p/oshimai", my); await say("p/ganbatta", my);
+  if (my === run) showSheet(my);
+}
+
+/* シール：まず真ん中に大きく出す → 子がさわると台紙に飛んで貼られる */
+function showSheet(my) {
+  const T = THEMES[theme], bd = $("board"); bd.innerHTML = "";
+  for (let i = 0; i < 10; i++) { const s = document.createElement("span"); if (i < 2) { s.textContent = T.stickers[i]; s.className = "on"; } bd.appendChild(s); }
+  $("sheetEnd").hidden = true; $("hint").textContent = "シールを さわってね";
+  show("sheet");
+  const g = $("gift"); g.textContent = T.stickers[2]; g.className = ""; g.style.transform = ""; g.hidden = false;
+  play("p/seal");
+  g.onclick = () => {
+    g.onclick = null;
+    const slot = bd.children[2].getBoundingClientRect(), r = g.getBoundingClientRect();
+    const dx = slot.left + slot.width / 2 - (r.left + r.width / 2), dy = slot.top + slot.height / 2 - (r.top + r.height / 2);
+    g.className = "fly"; g.style.transform = `translate(${dx}px, ${dy}px) scale(${slot.width / r.width})`;
+    setTimeout(() => {
+      if (my !== run) return;
+      g.hidden = true; bd.children[2].textContent = T.stickers[2]; bd.children[2].className = "on";
+      $("hint").textContent = ""; $("sheetEnd").hidden = false;
+      say("p/yattane", my);
+    }, 650);
+  };
+}
+
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => openTheme(b.dataset.go));
+$("go").onclick = runDemo;
+$("sheetEnd").onclick = () => history.back();
+</script>
+</body>
+</html>
