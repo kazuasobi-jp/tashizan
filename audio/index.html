@@ -25,10 +25,10 @@
   <p class="small">音声：VOICEVOX:冥鳴ひまり</p>
 </main>
 <script>
-const PH = { hajimeru: "はじめるよ！", mouichido: "もういちど、いってね。", button: "ボタンで、こたえてね。",
-  kangaeyou: "もういっかい、かんがえよう。", kazoeyou: "いっしょに、かぞえよう。", iete: "こたえは、いくつかな？",
-  yattane: "やったね！", sugoi: "すごい！", kangaeta: "よく、かんがえたね！", kazoeta: "じぶんで、かぞえられたね！",
-  ganbatta: "さいごまで、がんばったね！", oshimai: "おしまい。", seal: "シールを、どうぞ！", ashita: "きょうは、ここまで。またあしたね。" };
+const PH = { hajimeru: "はじめるよ！", mouichido: "もういちど、いってね。", button: "ボタンでこたえてね。",
+  kangaeyou: "もういっかい、かんがえよう。", kazoeyou: "いっしょにかぞえよう。", iete: "こたえはいくつかな？",
+  yattane: "やったね！", sugoi: "すごい！", kangaeta: "よくかんがえたね！", kazoeta: "じぶんでかぞえられたね！",
+  ganbatta: "さいごまでがんばったね！", oshimai: "おしまい。", seal: "シールをどうぞ！", ashita: "きょうはここまで。またあしたね。" };
 const groups = [
   ["問題（a＋b は？）", (() => { const r = []; for (let a = 0; a <= 10; a++) for (let b = 0; a + b <= 10; b++) r.push([`q/${a}_${b}`, `${a}+${b}`]); return r; })()],
   ["せいかい", Array.from({ length: 11 }, (_, n) => [`ok/${n}`, `${n} せいかい`])],
@@ -39,7 +39,7 @@ let audio = null, cur = null, token = 0;
 function play(f, b) {
   return new Promise(res => {
     if (audio) { audio.pause(); cur && cur.classList.remove("playing"); }
-    audio = new Audio(f + ".wav"); cur = b; b.classList.add("playing");
+    audio = new Audio(f + ".wav?v=" + Date.now());   // 作り直した音が古いまま鳴らないように cur = b; b.classList.add("playing");
     audio.onended = audio.onerror = () => { b.classList.remove("playing"); res(); };
     audio.play().catch(res);
   });
