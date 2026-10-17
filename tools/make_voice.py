@@ -7,8 +7,8 @@
         python tools/make_voice.py audio --redo-acc=ジュウ,ナナ … 頭を絞って作り直す
 
 できるもの（audio/ の下）
-  q/a_b.wav   問題「aたすbは？」（a+b が 10 まで。0 も入れる）
-  ok/n.wav    「n。せいかい！」（0〜10）
+  q/a_b.wav   問題「aたすbは？」（a+b が 10 まで。0 も入れる）＋ ③' の 10+b（b＝1〜10）
+  ok/n.wav    「n。せいかい！」（0〜20。11〜20 は ③' 用）
   n/n.wav     数だけ（1〜20。一緒に数えるとき）
   p/*.wav     決まった言葉（下の PHRASES）
 """
@@ -45,7 +45,9 @@ def items():
     for a in range(11):
         for b in range(11 - a):
             yield f'q/{a}_{b}', f'{yomi(a)}たす{yomi(b)}は？'
-    for n in range(11):
+    for b in range(1, 11):   # ③' 10+□（答え11〜20）
+        yield f'q/10_{b}', f'{yomi(10)}たす{yomi(b)}は？'
+    for n in range(21):
         yield f'ok/{n}', f'{yomi(n)}。せいかい！'
     for n in range(1, 21):
         yield f'n/{n}', yomi(n)

@@ -31,7 +31,8 @@ const PH = { hajimeru: "はじめるよ！", pikotte: "ピコッてなったら�
   ganbatta: "さいごまでがんばったね！", oshimai: "おしまい。", seal: "シールをどうぞ！", ashita: "きょうはここまで。またあしたね。" };
 const groups = [
   ["問題（a＋b は？）", (() => { const r = []; for (let a = 0; a <= 10; a++) for (let b = 0; a + b <= 10; b++) r.push([`q/${a}_${b}`, `${a}+${b}`]); return r; })()],
-  ["せいかい", Array.from({ length: 11 }, (_, n) => [`ok/${n}`, `${n} せいかい`])],
+  ["問題（10＋□）", Array.from({ length: 10 }, (_, i) => [`q/10_${i + 1}`, `10+${i + 1}`])],
+  ["せいかい", Array.from({ length: 21 }, (_, n) => [`ok/${n}`, `${n} せいかい`])],
   ["数", Array.from({ length: 20 }, (_, i) => [`n/${i + 1}`, `${i + 1}`])],
   ["決まった言葉", Object.entries(PH).map(([k, t]) => [`p/${k}`, t])],
 ];
