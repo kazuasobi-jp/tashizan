@@ -12,11 +12,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
-<!-- TODO（家で）：フォントは使う字だけに絞って同梱する（オフラインでも同じ形になるように。OFL） -->
+<link rel="preload" href="fonts/rounded-800.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  /* フォント：M PLUS Rounded 1c を使う字だけに絞って同梱（tools/make_font.py。OFL、fonts/OFL.txt）。文を変えて新しい字が増えたら作り直す */
+  @font-face { font-family: "M PLUS Rounded 1c"; font-weight: 500; font-display: swap; src: url(fonts/rounded-500.woff2) format("woff2"); }
+  @font-face { font-family: "M PLUS Rounded 1c"; font-weight: 700; font-display: swap; src: url(fonts/rounded-700.woff2) format("woff2"); }
+  @font-face { font-family: "M PLUS Rounded 1c"; font-weight: 800; font-display: swap; src: url(fonts/rounded-800.woff2) format("woff2"); }
   /* デザイン「ほし」（夜空）。--ca/--cb：足される数・足す数の色（数字と十の枠の玉を同じ色に） */
   :root {
     --bg: #1b2347; --card: #263160; --ink: #fff8e6; --sub: #b9c0e0; --line: #4a5694;

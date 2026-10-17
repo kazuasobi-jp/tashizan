@@ -12,11 +12,12 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parent.parent
-EXT = "wav"   # 音の形式（Opus に縮めたら "ogg" などに変える。js/version.js の audioExt になる）
+EXT = "ogg"   # 公開版の音の形式（Opus。tools/to_opus.py で wav から作る。js/version.js の audioExt になる。手元の dev は wav）
 SHELL = ["./", "manifest.webmanifest", "numparse.js", "js/version.js", "js/quiz.js", "js/store.js", "js/sound.js",
          "js/listen.js", "js/app.js", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png",
-         "icons/favicon-32.png", "icons/apple-touch-icon.png"]
-COPY_DIRS = ["js", "icons", "test", "design", "samples"]
+         "icons/favicon-32.png", "icons/apple-touch-icon.png",
+         "fonts/rounded-500.woff2", "fonts/rounded-700.woff2", "fonts/rounded-800.woff2"]
+COPY_DIRS = ["js", "icons", "fonts", "test", "design", "samples"]
 COPY_FILES = ["index.html", "manifest.webmanifest", "numparse.js", "sw.js"]
 
 
@@ -52,6 +53,9 @@ def build(out):
         (out / "audio" / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(f, out / "audio" / rel)
     shutil.copy2(ROOT / "audio" / "index.html", out / "audio" / "index.html")
+    no_ogg = sorted(w.relative_to(ROOT / "audio").as_posix() for w in (ROOT / "audio").rglob("*.wav")
+                    if not w.relative_to(ROOT / "audio").as_posix().startswith("try/") and not w.with_suffix(f".{EXT}").exists())
+    assert not no_ogg, f"{EXT} がない音があります（python tools/to_opus.py を実行）: {', '.join(no_ogg)}"
     missing = sorted(needed_audio() - set(audio))
     if missing:
         print("注意：音がありません（鳴らさずに進みます）:", ", ".join(missing))
