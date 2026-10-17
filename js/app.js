@@ -143,10 +143,23 @@ function askButtons(opts, sig) {
   });
 }
 
+/* 1回分の「聞く時間」。Android の認識は数秒黙ると切れる（変えられない）ので、声が来ないまま切れたら
+   🎤を光らせたまま WAIT_MS までそっと聞き直す（10/17 実機で「答えるまでの時間が短い」） */
+const WAIT_MS = 15000;
+async function listenFor(sig) {
+  const t0 = Date.now();
+  let opened = false, r;
+  for (;;) {
+    r = await Listen.once(sig, { onOpen: () => { setMic("on"); if (!opened) Sound.ping(); opened = true; }, onSpeech: () => setMic("heard") });
+    if (r.type === "result" || !["no-speech", "no-result", "timeout"].includes(r.error) || Date.now() - t0 >= WAIT_MS) return r;
+    setMic("on");   // 声が届いた表示を戻す（数として聞き取れないまま切れたとき）
+  }
+}
+
 async function getAnswer(ans, opts, input, sig) {
   if (input === "voice" && Listen.available() && navigator.onLine && !voiceDown) {
     for (let tryNo = 0; tryNo < 2; tryNo++) {
-      const r = await Listen.once(sig, { onOpen: () => { setMic("on"); Sound.ping(); }, onSpeech: () => setMic("heard") });
+      const r = await listenFor(sig);
       setMic("");
       if (r.type === "result") { const n = Listen.pick(r.t, ans); if (n != null) return { n, by: "voice" }; }  // 数として聞き取れなければ不正解にしない
       else if (["not-allowed", "service-not-allowed", "audio-capture"].includes(r.error)) { voiceDown = true; break; }
