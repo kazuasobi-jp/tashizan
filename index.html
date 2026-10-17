@@ -4,427 +4,286 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#f6f1e7">
-<title>たしざん（音声の試作）</title>
+<meta name="theme-color" content="#1b2347">
+<title>たしざん</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="たしざん">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<!-- TODO（家で）：フォントは使う字だけに絞って同梱する（オフラインでも同じ形になるように。OFL） -->
 <style>
+  /* デザイン「ほし」（夜空）。--ca/--cb：足される数・足す数の色（数字と十の枠の玉を同じ色に） */
   :root {
-    --bg: #f6f1e7; --card: #fffdf8; --ink: #2f3a40; --sub: #6b767c;
-    --accent: #2f7d6d; --accent-ink: #fff; --mic: #e08a2e; --line: #e2dccf;
-    --ok: #2f7d6d; --soft: #efe8d8;
+    --bg: #1b2347; --card: #263160; --ink: #fff8e6; --sub: #b9c0e0; --line: #4a5694;
+    --num: #ffd54a; --ca: #ffd54a; --cb: #7ee0ff; --accent: #ffd54a; --accent-ink: #1b2347;
+    --mic: #7ee0ff; --cell: #2b3770; --frame: #7380c8;
+    --lit: #3f51b5; --lit-edge: #ffd54a; --qbox: #33407a; --qedge: #ffd54a;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-    font-family: "Noto Sans JP", system-ui, sans-serif;
-    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
-  main { max-width: 720px; margin: 0 auto; padding: 16px; min-height: 100%;
-    display: flex; flex-direction: column; gap: 16px; }
-  h1 { font-size: 22px; margin: 4px 0; }
-  p { line-height: 1.6; margin: 0; }
-  .small { font-size: 14px; color: var(--sub); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
-  button { font: inherit; border: 0; border-radius: 16px; cursor: pointer; touch-action: manipulation; }
-  .big { background: var(--accent); color: var(--accent-ink); font-size: 26px; font-weight: 700;
-    padding: 18px 24px; width: 100%; }
-  .sec { background: var(--soft); color: var(--ink); font-size: 18px; padding: 14px 18px; }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; }
-  .row > * { flex: 1 1 200px; }
-  #home, #results { display: flex; flex-direction: column; gap: 12px; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif; font-weight: 500;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none; touch-action: pan-y; }   /* 引っ張って再読み込み・2本指の拡大を止める */
+  button { font: inherit; border: 0; cursor: pointer; touch-action: manipulation; color: inherit; }
   [hidden] { display: none !important; }
+  main { max-width: 560px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  section { flex: 1; display: flex; flex-direction: column; }
+  .credit { font-size: 12px; color: var(--sub); text-align: center; margin-top: 12px; }
 
-  /* 問題の画面 */
-  #play { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-  #prog { align-self: stretch; display: flex; justify-content: space-between; color: var(--sub); font-size: 16px; }
-  #q { font-size: clamp(64px, 18vw, 120px); font-weight: 800; letter-spacing: .04em; line-height: 1.1; text-align: center; }
-  .frame { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: min(100%, 420px);
-    background: var(--card); border: 3px solid var(--line); border-radius: 12px; padding: 8px; }
-  .frame span { aspect-ratio: 1; display: grid; place-items: center; font-size: clamp(26px, 8vw, 48px);
-    border: 2px dashed var(--line); border-radius: 8px; transition: transform .2s, background .2s; }
-  .frame span.lit { background: #fde9c8; transform: scale(1.12); }
-  #frames { display: flex; flex-direction: column; gap: 8px; align-items: center; width: 100%; }
+  /* ---------- 親の歯車（3秒長押しで おとなの画面へ） ---------- */
+  #gear { position: fixed; top: max(10px, env(safe-area-inset-top)); right: 10px; width: 40px; height: 40px; z-index: 8;
+    border-radius: 50%; background: transparent; font-size: 20px; opacity: .35; filter: grayscale(1); -webkit-touch-callout: none; }
+  #gear.hold { opacity: 1; animation: spin 3s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  #mic { width: 120px; height: 120px; border-radius: 50%; font-size: 56px; background: var(--soft);
-    color: var(--sub); display: grid; place-items: center; transition: background .2s, box-shadow .2s; }
-  #mic.on { background: var(--mic); color: #fff; box-shadow: 0 0 0 0 rgba(224,138,46,.6); animation: pulse 1.4s infinite; }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(224,138,46,.55); } 100% { box-shadow: 0 0 0 28px rgba(224,138,46,0); } }
-  #say { font-size: 28px; font-weight: 700; min-height: 1.4em; text-align: center; }
-  #heard { font-size: 14px; color: var(--sub); min-height: 1.2em; text-align: center; word-break: break-all; }
-  #choices { display: flex; gap: 12px; width: 100%; }
-  #choices button { flex: 1; font-size: 40px; font-weight: 800; padding: 16px 0; background: var(--card);
-    border: 3px solid var(--line); color: var(--ink); }
-  #after { display: flex; gap: 12px; width: 100%; }
-  #after .big { flex: 2; }
-  #after .sec { flex: 1; font-size: 16px; }
+  /* ---------- はじめる画面・またあした画面 ---------- */
+  #start, #rest { align-items: center; justify-content: center; gap: 24px; text-align: center; }
+  .hero { font-size: 96px; line-height: 1; background: none; }
+  #start h1, #rest h1 { font-size: 40px; font-weight: 800; margin: 0; color: var(--num); }
+  #rest p:not(.credit) { font-size: 24px; font-weight: 700; margin: 0; color: var(--sub); }
+  .go { background: var(--accent); color: var(--accent-ink); font-size: 34px; font-weight: 800;
+    padding: 20px 56px; border-radius: 999px; box-shadow: 0 6px 0 rgba(0,0,0,.18); }
+  .go:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+  .go:disabled { opacity: .5; }
+  .mini { display: grid; grid-template-columns: repeat(5, 36px); gap: 6px; }
+  .mini span { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 2px dashed var(--line); font-size: 24px; }
+  .mini span.on { border: 0; background: var(--qbox); }
 
-  table { border-collapse: collapse; width: 100%; font-size: 15px; }
-  th, td { border-bottom: 1px solid var(--line); padding: 6px 4px; text-align: center; }
-  .verdict { font-size: 20px; font-weight: 700; }
-  #log { font-size: 13px; max-height: 260px; overflow: auto; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
-  .warn { background: #fff1e0; border-color: #f0c99a; }
+  /* ---------- 問題の画面 ---------- */
+  #play { gap: 16px; align-items: center; }
+  #prog { display: flex; justify-content: center; gap: 10px; font-size: 30px; min-height: 44px; align-items: center; }
+  #prog span { width: 40px; height: 40px; display: grid; place-items: center; }
+  #prog span.todo { filter: grayscale(1); opacity: .3; }
+  #prog span.new { animation: pop .5s ease-out; }
+
+  #eq { display: flex; align-items: center; justify-content: center; gap: .18em; font-size: clamp(60px, 19vw, 104px);
+    font-weight: 800; line-height: 1; color: var(--num); text-shadow: 0 0 18px rgba(255,213,74,.35); }
+  #eq .op { color: var(--sub); font-size: .7em; }
+  #qa { color: var(--ca); } #qb { color: var(--cb); text-shadow: 0 0 18px rgba(126,224,255,.35); }
+  #ans { min-width: 1.15em; height: 1.2em; display: grid; place-items: center; border-radius: .22em; background: var(--qbox);
+    border: 3px dashed var(--qedge); color: var(--sub); }
+  #ans.got { color: var(--num); border-style: solid; animation: pop .45s ease-out; }
+  @keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+  /* 十の枠：2段×5。玉は同じ形で色だけ違う（算数ブロックと同じ考え方）。off＝絵を消している（場所は残す） */
+  .frame { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: min(100%, 420px); padding: 8px;
+    border: 3px solid var(--frame); border-radius: 16px; transition: opacity .3s; }
+  .frame.off { visibility: hidden; opacity: 0; }
+  .frame span { aspect-ratio: 1; display: grid; place-items: center; background: var(--cell); border-radius: 8px;
+    border: 3px solid transparent; transition: transform .2s, background .2s; }
+  .frame span.lit { background: var(--lit); border-color: var(--lit-edge); transform: scale(1.1); }
+  .tok { width: 70%; aspect-ratio: 1; border-radius: 50%; background: var(--ca); box-shadow: inset 0 -5px 0 rgba(0,0,0,.18), inset 0 4px 0 rgba(255,255,255,.35); }
+  .tok.b { background: var(--cb); }
+
+  /* マイク：読み上げ中は🔊でゆれる → 聞いている間は🎤を光らせて大きく、波紋 → 声が届いたら波紋を止める */
+  #mic { position: relative; width: 124px; height: 124px; border-radius: 50%; display: grid; place-items: center; font-size: 54px;
+    background: transparent; border: 4px solid var(--frame); opacity: .45; transition: transform .2s, background .2s, border-color .2s, opacity .2s; }
+  #mic.speak { opacity: 1; animation: bob .7s ease-in-out infinite; }
+  #mic.on, #mic.heard { opacity: 1; background: rgba(126,224,255,.18); border-color: var(--mic); box-shadow: 0 0 24px rgba(126,224,255,.8); transform: scale(1.15); }
+  #mic::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 6px solid var(--mic); opacity: 0; pointer-events: none; }
+  #mic.on::after { animation: ripple 1.3s ease-out infinite; }
+  @keyframes ripple { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.5); opacity: 0; } }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  #say { font-size: 26px; font-weight: 800; min-height: 1.4em; text-align: center; }
+
+  #choices { display: flex; gap: 14px; width: 100%; justify-content: center; }
+  #choices button { width: min(30%, 120px); aspect-ratio: 1; font-size: 52px; font-weight: 700; border-radius: 50%;
+    background: var(--card); border: 3px solid var(--frame); color: var(--num); }
+  #choices button:active { transform: translateY(4px); }
+
+  /* タブレット横置き：左に数式と枠、右にマイクとボタン */
+  @media (orientation: landscape) and (min-width: 700px) {
+    main { max-width: 1000px; }
+    #play { display: grid; grid-template-columns: 1.2fr 1fr; grid-auto-flow: dense; column-gap: 32px; align-content: center; justify-items: center; }
+    #prog { grid-column: 1 / -1; }
+    #eq, .frame { grid-column: 1; }
+    #mic, #say, #choices { grid-column: 2; }
+    #mic { grid-row: 2; align-self: end; } #say { grid-row: 3; } #choices { grid-row: 4; }
+  }
+
+  /* ---------- 正解の演出：ほしが はじける ---------- */
+  #fx { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  .spark { position: absolute; font-size: 32px; animation: burst 1.1s ease-out forwards; }
+  @keyframes burst { 0% { transform: translate(0,0) scale(.3); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 0; } }
+
+  /* ---------- シール台紙 ---------- */
+  #sheet { align-items: center; gap: 18px; text-align: center; }
+  #sheet h2 { font-size: 30px; font-weight: 800; margin: 8px 0 0; color: var(--num); }
+  .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 480px; padding: 16px;
+    background: var(--card); border-radius: 24px; border: 3px solid var(--line); }
+  .board span { aspect-ratio: 1; border-radius: 50%; border: 3px dashed var(--frame); display: grid; place-items: center; font-size: clamp(28px, 9vw, 46px); }
+  .board span.on { border: 4px solid #fff; background: var(--qbox); box-shadow: 0 3px 6px rgba(0,0,0,.18); }
+  #giftSpot { height: 200px; display: grid; place-items: center; }
+  #gift { width: 180px; height: 180px; z-index: 6; border-radius: 50%; position: relative;
+    background: var(--qbox); border: 8px solid #fff; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 110px; display: grid; place-items: center;
+    animation: giftIn .7s cubic-bezier(.3,1.6,.5,1) both, wiggle 1.6s .8s ease-in-out infinite; transition: transform .6s ease-in, opacity .6s; }
+  @keyframes giftIn { 0% { transform: scale(.2) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes wiggle { 0%, 100% { rotate: 0deg; } 25% { rotate: -6deg; } 75% { rotate: 6deg; } }
+  #gift.fly { animation: none; }
+  #sheet .hint { font-size: 22px; font-weight: 800; color: var(--sub); min-height: 1.4em; }
+
+  /* ---------- おとなの画面（字を小さく、読みやすく） ---------- */
+  body[data-screen="parent"] { -webkit-user-select: text; user-select: text; }
+  #parent { gap: 14px; font-size: 16px; line-height: 1.6; }
+  #parent h1 { font-size: 22px; margin: 4px 0 0; }
+  #parent h2 { font-size: 17px; margin: 0 0 6px; color: var(--num); }
+  #parent .box { background: var(--card); border-radius: 16px; padding: 12px 14px; border: 2px solid var(--line); }
+  #parent label { display: flex; gap: 8px; align-items: center; padding: 6px 0; }
+  #parent label.off { opacity: .45; }
+  #parent input[type=radio] { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+  #parent small, #parent .sm { color: var(--sub); font-size: 13px; }
+  #parent .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #parent .btn { background: var(--qbox); border: 2px solid var(--frame); border-radius: 12px; padding: 8px 14px; font-size: 16px; font-weight: 700; }
+  #parent .btn.main { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  #parent .btn.warn { border-color: #ff8a80; color: #ffb4ab; }
+  #parent .step { width: 44px; height: 44px; font-size: 24px; padding: 0; }
+  #parent .big { font-size: 26px; font-weight: 800; min-width: 2ch; text-align: center; }
+  #parent table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  #parent th, #parent td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+  #parent th:first-child, #parent td:first-child { text-align: left; }
+  #parent .tip { font-weight: 700; }
+  #parent .tip.up { color: #9be7a1; } #parent .tip.down { color: #ffb4ab; }
+  #parent a { color: var(--cb); }
+  #parent details summary { cursor: pointer; font-weight: 700; }
+  #parent ol { margin: 6px 0; padding-left: 1.4em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+  }
 </style>
 </head>
-<body>
+<body data-screen="start">
+<button id="gear" aria-label="おとなのボタン（3秒おす）">⚙️</button>
 <main>
 
-<!-- はじめの画面（親が操作する） -->
-<section id="home">
-  <h1>たしざん ― 音声の試作 <span class="small">版5</span></h1>
-  <div class="card warn" id="nosupport" hidden><p>この端末のブラウザは音声認識に対応していません。Android の Chrome で開いてください。</p></div>
-  <div class="card warn" id="offline" hidden><p>インターネットにつながっていません。音声認識はつながっているときだけ使えます。</p></div>
-  <div class="card">
-    <p><b>聞き取りテスト</b>（1回9問・数は2〜10）。画面の数を子どもが声で言い、アプリが聞き取れたかを数えます。<br>
-    「そのまま」と「〜こ を付けて」を<b>それぞれ2回ずつ</b>（2日に分けてOK）やってください。<br>
-    🎤が光って「ピコッ」と鳴ってから、<b>ふつうの声</b>で言うよう伝えてください（大きすぎる声は聞き取れないことがあります）。</p>
-    <div class="row" style="margin-top:12px">
-      <button class="big" data-start="plain">そのまま言う</button>
-      <button class="big" data-start="ko">「〜こ」を付けて言う</button>
-    </div>
-  </div>
-  <div class="card">
-    <p><b>れんしゅう</b>（たしざん5問・答え5まで）。読み上げ → 自動で聞き取り → 正解判定の流れを試します。</p>
-    <div class="row" style="margin-top:12px"><button class="big" data-start="practice">れんしゅうを はじめる</button></div>
-  </div>
-  <div class="card">
-    <div class="row"><button class="sec" id="toResults">テストの結果を見る</button><button class="sec" id="testVoice">読み上げを試す</button></div>
-    <p class="small" style="margin-top:12px">初めて使うときにマイクの許可を聞かれたら「<b>アプリの使用中のみ許可</b>」（または「常に許可」）を選んでください。「今回のみ」だと毎回聞かれます。<br>
-    数は「よん」「なな」と読むように教えてください（「し」「しち」は聞き違えやすいため）。<br>
-    <span id="voiceInfo"></span><br>
-    声は Google の音声認識に送られます。記録はこの端末の中だけに残り、どこにも送りません。</p>
-  </div>
+<!-- はじめる画面 -->
+<section id="start">
+  <div class="hero">🌟</div>
+  <h1>たしざん</h1>
+  <div class="mini" id="miniStart" aria-label="シール"></div>
+  <button class="go" id="go">はじめる</button>
+  <p class="credit">音声：VOICEVOX:冥鳴ひまり</p>
+</section>
+
+<!-- 1日の上限まで終わった -->
+<section id="rest" hidden>
+  <button class="hero" id="moon" aria-label="またあしたね">🌙</button>
+  <h1>またあしたね</h1>
+  <p>きょうは ここまで</p>
+  <div class="mini" id="miniRest" aria-label="シール"></div>
+  <p class="credit">音声：VOICEVOX:冥鳴ひまり</p>
 </section>
 
 <!-- 問題の画面 -->
 <section id="play" hidden>
-  <div id="prog"><span id="progText"></span><button class="sec" id="quit" style="padding:6px 14px;font-size:15px">やめる</button></div>
-  <div id="q"></div>
-  <div id="frames"></div>
-  <div id="mic" aria-hidden="true">🎤</div>
+  <div id="prog"></div>
+  <div id="eq"><span id="qa"></span><span class="op">+</span><span id="qb"></span><span class="op">=</span><span id="ans">?</span></div>
+  <div class="frame" id="frame"></div>
+  <div id="mic" aria-hidden="true"></div>
   <div id="say"></div>
-  <div id="heard"></div>
   <div id="choices" hidden></div>
-  <div id="after" hidden>
-    <button class="sec" id="exclude">いいまちがい<br><span class="small">集計から外す</span></button>
-    <button class="big" id="next">つぎへ</button>
-  </div>
 </section>
 
-<!-- 結果の画面（親が見る） -->
-<section id="results" hidden>
-  <h1>聞き取りテストの結果</h1>
-  <div class="card" id="summary"></div>
-  <div class="card"><b>数ごとの正解 / 回数</b><div id="byNum" style="margin-top:8px"></div></div>
-  <div class="card"><b>聞き取った文字の記録</b>（新しい順）<div id="log" style="margin-top:8px"></div></div>
-  <div class="row">
-    <button class="sec" id="copy">結果をコピー</button>
-    <button class="sec" id="back">もどる</button>
-  </div>
-  <div class="row"><button class="sec" id="reset" style="color:#a33">記録をぜんぶ消す</button></div>
+<!-- シール台紙 -->
+<section id="sheet" hidden>
+  <h2>シールを どうぞ！</h2>
+  <div class="board" id="board"></div>
+  <div id="giftSpot"><div id="gift" hidden></div></div>
+  <div class="hint" id="hint"></div>
+  <button class="go" id="sheetEnd" hidden>おしまい</button>
 </section>
 
+<!-- おとなの画面（⚙️を3秒おす） -->
+<section id="parent" hidden>
+  <h1>おとなの画面</h1>
+
+  <div class="box">
+    <h2>段階</h2>
+    <div id="stages"></div>
+    <div id="advice" class="sm"></div>
+  </div>
+
+  <div class="box">
+    <h2>絵（十の枠）の減らし方</h2>
+    <div id="fades"></div>
+    <small>一緒に数えるとき（2回目のまちがい）は、どれでも絵を出します。</small>
+  </div>
+
+  <div class="box">
+    <h2>答え方</h2>
+    <label><input type="radio" name="input" value="voice"> 声（聞き取れないときはボタン）</label>
+    <label><input type="radio" name="input" value="button"> ボタンだけ</label>
+    <small>声は聞き取りのため Google に送られます（数を話す間だけ）。Wi-Fi がないときは自動でボタンになります。</small>
+  </div>
+
+  <div class="box">
+    <h2>1日の回数（1回＝5問・シール1まい）</h2>
+    <div class="row">
+      <button class="btn step" id="limDown" aria-label="へらす">−</button>
+      <span class="big" id="limit"></span><span>回</span>
+      <button class="btn step" id="limUp" aria-label="ふやす">＋</button>
+      <span class="sm" id="todayN"></span>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>記録（この端末の中だけ）</h2>
+    <table><thead><tr><th>日付</th><th>回</th><th>問題</th><th>一発正解</th><th>中央値</th></tr></thead><tbody id="days"></tbody></table>
+    <small>中央値：答えるまでの秒数。もう一度の問題は数えません。</small>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="copy">記録をコピー</button>
+      <button class="btn warn" id="clear">記録を消す</button>
+      <span class="sm" id="copied"></span>
+    </div>
+  </div>
+
+  <div class="box">
+    <details>
+      <summary>はじめに（ホーム画面に追加・マイク・アプリ固定）</summary>
+      <ol>
+        <li>Chrome の右上の︙ →「ホーム画面に追加」（または「アプリをインストール」）。</li>
+        <li>マイクの許可は「アプリの使用中のみ許可」を選ぶ（「今回のみ」だと毎回聞かれます）。</li>
+        <li>数は「よん」「なな」と読むよう、子どもに伝えておく。「ピコッ」と鳴ってから言う。</li>
+        <li>ほかのアプリに行かないよう Android の「アプリ固定」を使う：設定で「アプリ固定」をオンにする → 最近使ったアプリの画面で、このアプリの上のアイコンを押して「固定」。<br>
+          <small>設定の場所と解除のしかたは機種で違います（多くは 設定 → セキュリティ → その他 → アプリ固定。解除は「戻る」と「最近」の長押しや、下から上へのスワイプで止める、など）。</small></li>
+      </ol>
+    </details>
+  </div>
+
+  <div class="box sm">
+    <a href="test/">聞き取りテスト</a> ・ <a href="audio/">声の確認</a><br>
+    音声：VOICEVOX:冥鳴ひまり　／　版 <span id="ver"></span>
+  </div>
+
+  <button class="go" id="back">もどる</button>
+</section>
+
+<div id="fx"></div>
 </main>
 
+<script src="js/version.js"></script>
 <script src="numparse.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/store.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/listen.js"></script>
+<script src="js/app.js"></script>
 <script>
-"use strict";
-const $ = id => document.getElementById(id);
-const KEY = "tashizan.proto.v1";
-const FRUITS = ["🍎","🍊","🍓","🍇","🍑","🍌"];
-const ANIMALS = ["🐶","🐱","🐰","🐻","🐼","🐸"];
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-/* ---------- 記録（端末内だけ） ---------- */
-function load() { try { return JSON.parse(localStorage.getItem(KEY)) || { trials: [] }; } catch (e) { return { trials: [] }; } }
-function save(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }
-if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-
-/* ---------- 読み上げ ---------- */
-let voice = null, utter = null;  // utter は変数に持っておく（途中で消されて onend が来ない不具合の対策）
-function pickVoice() {
-  const vs = speechSynthesis.getVoices().filter(v => /^ja/i.test(v.lang));
-  voice = vs.find(v => /google/i.test(v.name)) || vs[0] || null;
-  const el = document.getElementById("voiceInfo");
-  if (el) el.textContent = voice ? `読み上げの声：${voice.name}（${voice.lang}）` : "読み上げの声：日本語の声が見つかりません（端末の設定で日本語の音声データを入れてください）";
-}
-if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.addEventListener("voiceschanged", pickVoice); }
-
-function speak(text) {
-  return new Promise(resolve => {
-    if (!("speechSynthesis" in window)) return resolve();
-    let done = false;
-    const fin = () => { if (!done) { done = true; clearTimeout(timer); resolve(); } };
-    speechSynthesis.cancel();
-    utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "ja-JP"; utter.rate = 0.9; utter.pitch = 1.1;
-    if (voice) utter.voice = voice;
-    utter.onend = fin; utter.onerror = fin;
-    const timer = setTimeout(fin, text.length * 300 + 2000);  // onend が来ないとき
-    speechSynthesis.speak(utter);
+/* オフライン用の Service Worker（公開版だけ。手元の "dev" では登録しない）。更新の知らせは出さない（sw.js の説明） */
+if ("serviceWorker" in navigator && APP.ver !== "dev") {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").then(reg => {
+      // ホーム画面から開き直したとき（裏から戻ったとき）にも新しい版を探す
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => {});
   });
 }
-const wait = ms => new Promise(r => setTimeout(r, ms));
-
-/* ---------- 聞き取り ---------- */
-// マイクが開いた合図の音（端末の開始音は鳴らないので自前で鳴らす）。最初のタップで作る
-let actx = null;
-function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {} }
-function ping() {
-  if (!actx) return;
-  try {
-    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
-    o.type = "sine"; o.frequency.setValueAtTime(880, t); o.frequency.setValueAtTime(1320, t + 0.08);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.2);
-  } catch (e) {}
-}
-let rec = null;
-function listenOnce() {
-  return new Promise(resolve => {
-    let done = false;
-    const t0 = Date.now(); let lag = null;  // lag: start() からマイクが開くまで
-    const fin = r => { if (!done) { done = true; clearTimeout(timer); $("mic").classList.remove("on"); r.lag = lag; resolve(r); } };
-    rec = new SR();
-    rec.lang = "ja-JP"; rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 5;
-    rec.onaudiostart = () => { lag = Date.now() - t0; $("mic").classList.add("on"); ping(); };
-    rec.onresult = e => {
-      const alts = [];
-      const r0 = e.results[0];
-      for (let i = 0; i < r0.length; i++) alts.push({ t: r0[i].transcript, c: Math.round((r0[i].confidence || 0) * 100) / 100 });
-      fin({ type: "result", alts });
-    };
-    rec.onerror = e => fin({ type: "error", error: e.error });
-    rec.onend = () => fin({ type: "error", error: "no-result" });
-    const timer = setTimeout(() => { try { rec.abort(); } catch (e) {} fin({ type: "error", error: "timeout" }); }, 12000);
-    try { rec.start(); } catch (e) { fin({ type: "error", error: "start-failed" }); }
-  });
-}
-function stopListening() { try { rec && rec.abort(); } catch (e) {} }
-
-/* 1回分：無反応なら1回だけ自動で聞き直す */
-async function listen() {
-  let r = await listenOnce();
-  if (r.type === "error" && (r.error === "no-speech" || r.error === "no-result") && running) {
-    $("say").textContent = "もういちど いってね";
-    await speak("もういちど、いってね。");
-    await wait(300);
-    if (running) r = await listenOnce();
-  }
-  return r;
-}
-
-/* 候補の文字列 → 数の集合 */
-function numbersOf(alts) {
-  const all = new Set();
-  alts.forEach(a => NumParse.parseNumber(a.t).forEach(n => all.add(n)));
-  return all;
-}
-
-/* ---------- 絵（十の枠） ---------- */
-function drawFrames(a, b) {
-  const box = $("frames"); box.innerHTML = "";
-  const e1 = FRUITS[Math.floor(Math.random() * FRUITS.length)];
-  const e2 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-  const total = a + b, cells = [];
-  for (let f = 0; f < Math.max(1, Math.ceil(total / 10)); f++) {
-    const fr = document.createElement("div"); fr.className = "frame";
-    for (let i = 0; i < 10; i++) {
-      const k = f * 10 + i, s = document.createElement("span");
-      s.textContent = k < a ? e1 : k < total ? e2 : "";
-      fr.appendChild(s); cells.push(s);
-    }
-    box.appendChild(fr);
-  }
-  return cells;
-}
-
-/* ---------- 画面の切り替え ---------- */
-let running = false;
-function show(id) {
-  ["home", "play", "results"].forEach(s => $(s).hidden = s !== id);
-  if (id !== "home" && !(history.state && history.state.sub)) history.pushState({ sub: true }, "");
-}
-addEventListener("popstate", () => { if (!$("home").hidden) return; running = false; stopListening(); if ("speechSynthesis" in window) speechSynthesis.cancel(); show("home"); checkEnv(); });
-function goHome() {
-  if (history.state && history.state.sub) { history.back(); return; }  // popstate でホームに戻す
-  running = false; stopListening(); if ("speechSynthesis" in window) speechSynthesis.cancel(); show("home"); checkEnv();
-}
-function checkEnv() { $("nosupport").hidden = !!SR; $("offline").hidden = navigator.onLine; }
-addEventListener("online", checkEnv); addEventListener("offline", checkEnv);
-checkEnv();
-
-function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-function waitClick(...ids) {
-  return new Promise(res => {
-    const hs = ids.map(id => { const h = () => { hs.forEach(([i, f]) => $(i).removeEventListener("click", f)); res(id); }; $(id).addEventListener("click", h); return [id, h]; });
-  });
-}
-
-/* ---------- 聞き取りテスト ---------- */
-async function runTest(mode) {
-  if (!SR) return;
-  running = true; show("play");
-  const targets = shuffle([2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  $("choices").hidden = true;
-  for (let i = 0; i < targets.length && running; i++) {
-    const n = targets[i];
-    $("progText").textContent = `テスト（${mode === "ko" ? "〜こ" : "そのまま"}） ${i + 1} / ${targets.length}`;
-    $("q").textContent = n;
-    drawFrames(n, 0);
-    $("say").textContent = ""; $("heard").textContent = ""; $("after").hidden = true;
-    await speak(mode === "ko" ? "「こ」を、つけてね。" : "なんていう？");
-    await wait(300);
-    if (!running) break;
-    const t0 = Date.now();
-    const r = await listen();
-    if (!running) break;
-    let outcome, nums = [];
-    if (r.type === "result") {
-      const set = numbersOf(r.alts); nums = [...set];
-      outcome = set.has(n) ? "ok" : set.size ? "wrong" : "other";
-    } else outcome = r.error === "no-speech" || r.error === "no-result" || r.error === "timeout" ? "silent" : "error:" + r.error;
-    const trial = { at: new Date().toISOString(), mode, target: n, outcome, nums, alts: r.alts || [], error: r.error || null, ms: Date.now() - t0, lag: r.lag, excluded: false };
-    const d = load(); d.trials.push(trial); save(d);
-
-    $("heard").textContent = r.alts ? "聞き取り：" + r.alts.map(a => a.t).join(" / ") : "（" + (r.error || "") + "）";
-    $("say").textContent = outcome === "ok" ? `「${n}」 きこえたよ！` : nums.length ? `「${nums[0]}」 って きこえたよ` : "うまく きこえなかったよ";
-    if (outcome === "ok") speak("きこえたよ！");
-    $("after").hidden = false;
-    $("exclude").disabled = false;
-    let b;
-    while ((b = await waitClick("next", "exclude")) === "exclude") {
-      const d2 = load(); const last = d2.trials[d2.trials.length - 1];
-      if (last && last.at === trial.at) { last.excluded = true; save(d2); }
-      $("exclude").disabled = true; $("say").textContent = "集計から外しました";
-    }
-  }
-  if (running) { running = false; await speak("おしまい。よく、がんばったね！"); showResults(); }
-}
-
-/* ---------- れんしゅう（答え5まで・5問） ---------- */
-async function runPractice() {
-  running = true; show("play");
-  const qs = [];
-  while (qs.length < 5) {
-    const a = 1 + Math.floor(Math.random() * 4), b = 1 + Math.floor(Math.random() * (5 - a));
-    if (!qs.some(q => q[0] === a && q[1] === b)) qs.push([a, b]);
-  }
-  for (let i = 0; i < qs.length && running; i++) {
-    const [a, b] = qs[i], ans = a + b;
-    $("progText").textContent = `れんしゅう ${i + 1} / ${qs.length}`;
-    $("q").textContent = `${a} + ${b}`;
-    const cells = drawFrames(a, b);
-    $("after").hidden = true; $("heard").textContent = "";
-    const opts = shuffle([...new Set([ans, Math.max(1, ans - 1), ans + 1])]);
-    if (opts.length < 3) opts.push(ans + 2);
-    let miss = 0, solved = false;
-    while (!solved && running) {
-      $("say").textContent = "";
-      await speak(`${a}たす${b}は？`);
-      await wait(300);
-      if (!running) break;
-      let got = null;  // 子が答えた数（ボタンでも声でも）
-      if (SR && navigator.onLine) {
-        $("choices").hidden = true;
-        const r = await listen();
-        if (!running) break;
-        if (r.type === "result") {
-          const set = numbersOf(r.alts);
-          $("heard").textContent = "聞き取り：" + r.alts.map(x => x.t).join(" / ");
-          if (set.has(ans)) got = ans; else if (set.size) got = [...set][0];
-        } else if (r.error === "network" || r.error === "service-not-allowed") {
-          $("say").textContent = "ボタンで こたえてね";
-        }
-      }
-      if (got === null) {  // 聞き取れない・通信なし → ボタンで
-        if (!$("say").textContent) $("say").textContent = "ボタンでも こたえられるよ";
-        got = await askButtons(opts);
-        if (!running) break;
-      }
-      $("say").textContent = `「${got}」`;
-      if (got === ans) {
-        solved = true; $("say").textContent = `${ans}！ せいかい！`;
-        await speak(`${ans}。せいかい！`);
-      } else if (++miss === 1) {
-        $("say").textContent = "もういっかい かんがえよう";
-        await speak("もういっかい、かんがえよう。");
-      } else {
-        $("say").textContent = "いっしょに かぞえよう";
-        await speak("いっしょに、かぞえよう。");
-        for (let k = 0; k < ans && running; k++) { cells[k].classList.add("lit"); await speak(String(k + 1)); }
-        cells.forEach(c => c.classList.remove("lit"));
-        solved = true;
-        $("say").textContent = `${ans} だね`; await speak(`${ans}、だね。`);
-      }
-      $("choices").hidden = true;
-    }
-    await wait(500);
-  }
-  if (running) { running = false; await speak("おしまい。よく、がんばったね！"); goHome(); }
-}
-function askButtons(opts) {
-  return new Promise(res => {
-    const box = $("choices"); box.innerHTML = ""; box.hidden = false;
-    const stop = setInterval(() => { if (!running) { clearInterval(stop); res(null); } }, 300);
-    opts.forEach(n => { const b = document.createElement("button"); b.textContent = n; b.onclick = () => { clearInterval(stop); box.hidden = true; res(n); }; box.appendChild(b); });
-  });
-}
-
-/* ---------- 結果 ---------- */
-const LABEL = { ok: "正解", wrong: "違う数", other: "数以外", silent: "無反応" };
-function summarize() {
-  const d = load(), out = {};
-  for (const mode of ["plain", "ko"]) {
-    const ts = d.trials.filter(t => t.mode === mode && !t.excluded);
-    const c = { ok: 0, wrong: 0, other: 0, silent: 0, error: 0 };
-    ts.forEach(t => (t.outcome in c ? c[t.outcome]++ : c.error++));
-    const n = ts.length, rate = n ? c.ok / n : 0;
-    const verdict = !n ? "まだ記録がありません" : rate >= 0.9 ? "音声が主でOK（90%以上）" : rate >= 0.75 ? "ボタン＋音声補助（75〜89%）" : "ボタンが主（75%未満）";
-    const byNum = {};
-    ts.forEach(t => { const b = byNum[t.target] = byNum[t.target] || [0, 0]; b[1]++; if (t.outcome === "ok") b[0]++; });
-    out[mode] = { n, c, rate, verdict, byNum, excluded: d.trials.filter(t => t.mode === mode && t.excluded).length };
-  }
-  return { out, trials: d.trials };
-}
-function showResults() {
-  show("results");
-  const { out, trials } = summarize();
-  const name = { plain: "そのまま", ko: "〜こ付き" };
-  $("summary").innerHTML = ["plain", "ko"].map(m => {
-    const s = out[m];
-    return `<p><b>${name[m]}</b>：${s.n}回（目標18回）中 正解 ${s.c.ok}（${Math.round(s.rate * 100)}%）` +
-      `　違う数 ${s.c.wrong}・数以外 ${s.c.other}・無反応 ${s.c.silent}・エラー ${s.c.error}・除外 ${s.excluded}</p>` +
-      `<p class="verdict" style="margin:4px 0 12px">${s.verdict}${s.n && s.n < 18 ? "（まだ途中）" : ""}</p>`;
-  }).join("");
-  let h = "<table><tr><th>数</th>" + [2,3,4,5,6,7,8,9,10].map(n => `<th>${n}</th>`).join("") + "</tr>";
-  for (const m of ["plain", "ko"]) h += `<tr><td>${name[m]}</td>` + [2,3,4,5,6,7,8,9,10].map(n => { const b = out[m].byNum[n]; return `<td>${b ? b[0] + "/" + b[1] : "-"}</td>`; }).join("") + "</tr>";
-  $("byNum").innerHTML = h + "</table>";
-  $("log").textContent = trials.slice().reverse().map(fmtTrial).join("\n") || "（なし）";
-}
-function fmtTrial(t) {
-  const d = new Date(t.at), ts = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `${ts} ${t.mode === "ko" ? "こ" : "素"} 答${t.target} → ${LABEL[t.outcome] || t.outcome}${t.excluded ? "（除外）" : ""} ` +
-    (t.alts.length ? "[" + t.alts.map(a => a.t + (a.c ? "(" + a.c + ")" : "")).join(" | ") + "]" : "") + ` ${(t.ms / 1000).toFixed(1)}秒` +
-    (t.lag != null ? `（マイク${(t.lag / 1000).toFixed(1)}秒）` : "");
-}
-
-/* ---------- ボタン ---------- */
-document.querySelectorAll("[data-start]").forEach(b => b.addEventListener("click", () => {
-  const m = b.dataset.start;
-  unlockAudio();
-  if (m === "practice") runPractice(); else runTest(m);
-}));
-$("quit").onclick = goHome;
-$("toResults").onclick = showResults;
-$("testVoice").onclick = () => { pickVoice(); speak("3たす4は？ 7。せいかい！ よく、がんばったね！"); };
-$("back").onclick = goHome;
-$("copy").onclick = async () => {
-  const { out, trials } = summarize();
-  const txt = ["たしざん 聞き取りテスト結果 " + new Date().toLocaleString("ja-JP"),
-    ...["plain", "ko"].map(m => `${m === "ko" ? "〜こ付き" : "そのまま"}: ${out[m].n}回 正解${out[m].c.ok} 違う数${out[m].c.wrong} 数以外${out[m].c.other} 無反応${out[m].c.silent} エラー${out[m].c.error} 除外${out[m].excluded} → ${out[m].verdict}`),
-    "", ...trials.map(fmtTrial)].join("\n");
-  try { await navigator.clipboard.writeText(txt); $("copy").textContent = "コピーしました"; }
-  catch (e) { $("log").textContent = txt; $("copy").textContent = "下の文字を長押しでコピー"; }
-  setTimeout(() => ($("copy").textContent = "結果をコピー"), 2500);
-};
-$("reset").onclick = () => { if (confirm("テストの記録をぜんぶ消します。よいですか？")) { save({ trials: [] }); showResults(); } };
 </script>
 </body>
 </html>

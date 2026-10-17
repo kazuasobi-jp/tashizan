@@ -25,6 +25,7 @@ def yomi(n): return str(n)
 
 PHRASES = {  # ファイル名: 言葉
     'hajimeru': 'はじめるよ！',
+    'pikotte': 'ピコッてなったら、いってね。',   # その日の1回目だけ（マイクの合図を待ってから話すように）
     'mouichido': 'もういちど、いってね。',
     'button': 'ボタンでこたえてね。',
     'kangaeyou': 'もういっかい、かんがえよう。',

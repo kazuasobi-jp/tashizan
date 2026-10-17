@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>判定のテスト（問題・記録）</title>
+<style>body { font-family: system-ui, sans-serif; margin: 16px; } .ng { color: #c00; font-weight: bold; }</style>
+</head>
+<body>
+<h1>問題の作り方・記録のテスト</h1>
+<p>記録（localStorage の tashizan.〜）は一度よけてから試して、最後に戻します。</p>
+<pre id="out"></pre>
+<script src="../js/quiz.js"></script>
+<script src="../js/store.js"></script>
+<script>
+"use strict";
+const out = [], fails = [];
+const ok = (cond, name) => { out.push((cond ? "OK " : "NG ") + name); if (!cond) fails.push(name); };
+const eq = (a, b, name) => ok(JSON.stringify(a) === JSON.stringify(b), name + "  → " + JSON.stringify(a));
+
+/* ---------- 問題 ---------- */
+const s1 = Quiz.byId("s1").pool, s1b = Quiz.byId("s1b").pool;
+eq(s1.length, 10, "①は10組");
+ok(s1.every(([a, b]) => a >= 1 && b >= 1 && a + b <= 5), "①は1以上・答え5まで");
+eq(s1b, [[5, 1], [5, 2], [5, 3], [5, 4], [5, 5]], "①'は 5+1〜5+5");
+for (let i = 0; i < 300; i++) {
+  const r = Quiz.makeRound("s1");
+  if (r.length !== 5 || new Set(r.map(q => q.a + "_" + q.b)).size !== 5 || !r.every(q => q.s === "s1" && q.a + q.b <= 5)) { ok(false, "①の1回 " + JSON.stringify(r)); break; }
+  if (i === 299) ok(true, "①の1回は5問・重なりなし（300回）");
+}
+for (let i = 0; i < 300; i++) {
+  const r = Quiz.makeRound("s1b"), mix = r.filter(q => q.s === "s1"), main = r.filter(q => q.s === "s1b");
+  if (r.length !== 5 || mix.length !== 1 || main.length !== 4 || !main.every(q => q.a === 5) || mix[0].a + mix[0].b > 5) { ok(false, "①'の1回 " + JSON.stringify(r)); break; }
+  if (i === 299) ok(true, "①'の1回は 5といくつ4問＋①1問（300回）");
+}
+eq(Quiz.makeRound("nai").every(q => q.s === "s1"), true, "知らない段階は①");
+for (let a = 0; a <= 10; a++) for (let b = 0; a + b <= 10; b++) {
+  for (let k = 0; k < 20; k++) {
+    const ans = a + b, o = Quiz.makeOpts(a, b, ans);
+    const good = o.length === 3 && new Set(o).size === 3 && o.includes(ans) && o.every(n => Number.isInteger(n) && n >= 0 && n <= 10) && o[0] < o[1] && o[1] < o[2];
+    if (!good) { ok(false, `選択肢 ${a}+${b} ${JSON.stringify(o)}`); a = 99; break; }
+  }
+  if (a === 10) ok(true, "選択肢は答えを含む3つ・0〜10・重なりなし・小さい順（全66組×20回）");
+}
+{ // 1+1 は近いものが 1・3 しかない → 0 か 4 で補う
+  const seen = new Set(); for (let k = 0; k < 200; k++) seen.add(Quiz.makeOpts(1, 1, 2).join(","));
+  ok([...seen].every(s => /^1,2,3$|^0,2,3$|^1,2,4$|^0,1,2$|^2,3,4$/.test(s) && s.includes("2")), "1+1 の選択肢 " + [...seen].join(" / "));
+}
+
+/* ---------- 記録（本物のキーをよけて試す） ---------- */
+const saved = {};
+for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k.startsWith("tashizan.")) { saved[k] = localStorage.getItem(k); localStorage.removeItem(k); } }
+// 同じ公開先（github.io）のほかのページの分は消さないよう、tashizan. だけ消す
+const wipe = () => { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k.startsWith("tashizan.")) localStorage.removeItem(k); } };
+try {
+  let T = new Date(2026, 9, 17, 18, 0).getTime(); Store.now = () => T;
+  eq(Store.today(), "2026-10-17", "今日の日付（端末の時刻）");
+  eq(Store.today(new Date(2026, 0, 5, 0, 1).getTime()), "2026-01-05", "0時すぎも その日");
+  eq(Store.settings(), { stage: "s1", fade: "show", limit: 2, input: "voice" }, "設定の初期値");
+  Store.saveSettings({ limit: 3 }); eq(Store.settings().limit, 3, "設定を保存");
+  localStorage.setItem("tashizan.settings", '{"limit":0}'); eq(Store.settings().limit, 2, "おかしな上限は初期値に");
+  localStorage.setItem("tashizan.settings", "こわれた"); eq(Store.settings().stage, "s1", "こわれた設定でも動く");
+  localStorage.removeItem("tashizan.settings");
+
+  eq(Store.todayLeft(), 2, "のこり2回");
+  eq(Store.addRound({ s: "s1", f: 5 }), 1, "シール1まい");
+  Store.addRound({ s: "s1", f: 4 });
+  eq(Store.todayLeft(), 0, "2回でのこり0");
+  T += 6 * 3600 * 1000;  // 翌日 0時
+  eq(Store.todayLeft(), 2, "日が変わるとのこり2回");
+  eq(Store.stickers(), 2, "シールは日をまたいで残る");
+
+  // 上げる目安：15問中13問一発・3日・中央値5秒以内
+  wipe();
+  const day = n => new Date(2026, 9, 10 + n, 18).getTime();
+  const addQs = (dayNo, list) => list.forEach(([f, sec]) => { T = day(dayNo); Store.addQuestion({ s: "s1", rs: "s1", a: 1, b: 1, f, m: f ? 0 : 1, sec, v: 1, r: 0 }); });
+  addQs(0, [[1, 2], [1, 3], [1, 2], [1, 4], [1, 2]]);
+  addQs(1, [[1, 2], [0, 8], [1, 3], [1, 2], [1, 2]]);
+  eq(Store.advice("s1").up, false, "10問・2日ではまだ");
+  addQs(2, [[1, 2], [1, 3], [0, 9], [1, 2], [1, 6]]);
+  let ad = Store.advice("s1");
+  eq([ad.n, ad.firsts, ad.days, ad.med, ad.up], [15, 13, 3, 2, true], "15問中13・3日・中央値2秒 → 上げどき");
+  T = day(2); Store.addQuestion({ s: "s1", a: 1, b: 1, f: 0, m: 2, sec: 9, v: 1, r: 1 });
+  eq(Store.advice("s1").n, 15, "もう一度の問題は数えない");
+  addQs(2, [[0, 3]]);
+  eq(Store.advice("s1").up, false, "直近15問で12問一発 → まだ");
+  eq(Store.advice("s1b").n, 0, "ほかの段階は別に数える");
+  // 中央値 5秒をこえると上げない
+  wipe();
+  for (let d = 0; d < 3; d++) addQs(d, [[1, 6], [1, 6], [1, 6], [1, 6], [1, 6]]);
+  eq(Store.advice("s1").up, false, "全部一発でも中央値6秒 → まだ");
+
+  // 戻す目安
+  wipe();
+  Store.addRound({ s: "s1b", f: 2 }); eq(Store.advice("s1b").down, false, "1回だけ5問中2 → まだ");
+  Store.addRound({ s: "s1", f: 0 }); Store.addRound({ s: "s1b", f: 1 });
+  eq(Store.advice("s1b").down, true, "その段階で2回続けて2問以下 → 戻しどき");
+  Store.addRound({ s: "s1b", f: 3 }); eq(Store.advice("s1b").down, false, "3問できたら戻さない");
+
+  // 日ごとのまとめ
+  wipe();
+  addQs(0, [[1, 2], [0, 4]]); T = day(0); Store.addRound({ s: "s1", f: 1 });
+  addQs(1, [[1, 3]]);
+  T = day(1); Store.addQuestion({ s: "s1", a: 1, b: 1, f: 0, m: 2, sec: 9, v: 0, r: 1 });
+  eq(Store.days(), [{ d: "2026-10-11", rounds: 0, n: 1, firsts: 1, med: 3 }, { d: "2026-10-10", rounds: 1, n: 2, firsts: 1, med: 3 }], "日ごとのまとめ（新しい日から）");
+  ok(/2026-10-11 \d\d:\d\d s1 1\+1 0 2 9 0 1/.test(Store.exportText()), "書き出しに1問ごとの行");
+  Store.clearRecords(); eq([Store.log().length, Store.rounds().length, Store.stickers()], [0, 0, 0], "記録を消す");
+  eq(Store.median([3, 1, 2, 10]), 2.5, "中央値（偶数）");
+} finally {
+  wipe(); for (const [k, v] of Object.entries(saved)) localStorage.setItem(k, v);
+}
+
+document.getElementById("out").innerHTML = out.map(s => s.startsWith("NG") ? `<span class="ng">${s}</span>` : s).join("\n")
+  + `\n\n${fails.length ? "NG " + fails.length + "件" : "すべて合格"}（${out.length}件）`;
+document.title = fails.length ? "NG" : "OK";
+</script>
+</body>
+</html>

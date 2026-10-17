@@ -25,7 +25,7 @@
   <p class="small">音声：VOICEVOX:冥鳴ひまり</p>
 </main>
 <script>
-const PH = { hajimeru: "はじめるよ！", mouichido: "もういちど、いってね。", button: "ボタンでこたえてね。",
+const PH = { hajimeru: "はじめるよ！", pikotte: "ピコッてなったら、いってね。", mouichido: "もういちど、いってね。", button: "ボタンでこたえてね。",
   kangaeyou: "もういっかい、かんがえよう。", kazoeyou: "いっしょにかぞえよう。", iete: "こたえはいくつかな？",
   yattane: "やったね！", sugoi: "すごい！", kangaeta: "よくかんがえたね！", kazoeta: "じぶんでかぞえられたね！",
   ganbatta: "さいごまでがんばったね！", oshimai: "おしまい。", seal: "シールをどうぞ！", ashita: "きょうはここまで。またあしたね。" };
@@ -39,7 +39,8 @@ let audio = null, cur = null, token = 0;
 function play(f, b) {
   return new Promise(res => {
     if (audio) { audio.pause(); cur && cur.classList.remove("playing"); }
-    audio = new Audio(f + ".wav?v=" + Date.now());   // 作り直した音が古いまま鳴らないように cur = b; b.classList.add("playing");
+    audio = new Audio(f + ".wav?v=" + Date.now());   // 作り直した音が古いまま鳴らないように
+    cur = b; b.classList.add("playing");
     audio.onended = audio.onerror = () => { b.classList.remove("playing"); res(); };
     audio.play().catch(res);
   });

@@ -1,0 +1,6 @@
+# 公開用に作る一式（tools/build.py --site _site）
+_site/
+# 画面確認の補助ページ・声の聞き比べ（コミットしない）
+_shot.html
+audio/try/
+__pycache__/
