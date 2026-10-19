@@ -145,7 +145,7 @@ function askButtons(opts, sig) {
 
 /* 1回分の「聞く時間」。Android の認識は数秒黙ると切れる（変えられない）ので、声が来ないまま切れたら
    🎤を光らせたまま WAIT_MS までそっと聞き直す（10/17 実機で「答えるまでの時間が短い」） */
-const WAIT_MS = 15000;
+const WAIT_MS = 8000;   // 10/17 は15秒 → 10/20 実機で「長すぎる」
 async function listenFor(sig) {
   const t0 = Date.now();
   let opened = false, r;
