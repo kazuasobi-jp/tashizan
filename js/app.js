@@ -146,26 +146,35 @@ function askButtons(opts, sig) {
 /* 1回分の「聞く時間」。Android の認識は数秒黙ると切れる（変えられない）ので、声が来ないまま切れたら
    🎤を光らせたまま WAIT_MS までそっと聞き直す（10/17 実機で「答えるまでの時間が短い」） */
 const WAIT_MS = 8000;   // 10/17 は15秒 → 10/20 実機で「長すぎる」
-async function listenFor(sig) {
+/* 聞き取りの記録（1回ずつ）：開＝マイクが開くまで・声＝声が届くまで・終＝終わるまで（秒）と結果。10/20 実機で
+   「言ったのに🎤が反応しない」→ マイクが開く前に話しているのか、聞き直しの切れ目か、声が拾えていないのかを見分ける */
+const sec1 = x => (x == null ? "-" : (x / 1000).toFixed(1));
+const traceOf = r => `開${sec1(r.ms && r.ms.o)} 声${sec1(r.ms && r.ms.sp)} 終${sec1(r.ms && r.ms.e)} ` +
+  (r.type === "result" ? `「${r.t.join("／")}」` : r.error);
+
+async function listenFor(sig, trace) {
   const t0 = Date.now();
   let opened = false, r;
   for (;;) {
     r = await Listen.once(sig, { onOpen: () => { setMic("on"); if (!opened) Sound.ping(); opened = true; }, onSpeech: () => setMic("heard") });
+    trace.push(traceOf(r));
     if (r.type === "result" || !["no-speech", "no-result", "timeout"].includes(r.error) || Date.now() - t0 >= WAIT_MS) return r;
     setMic("on");   // 声が届いた表示を戻す（数として聞き取れないまま切れたとき）
   }
 }
 
-async function getAnswer(ans, opts, input, sig) {
+async function getAnswer(ans, opts, input, sig, trace = []) {
   if (input === "voice" && Listen.available() && navigator.onLine && !voiceDown) {
     for (let tryNo = 0; tryNo < 2; tryNo++) {
-      const r = await listenFor(sig);
+      if (tryNo) trace.push("→もういちど");
+      const r = await listenFor(sig, trace);
       setMic("");
       if (r.type === "result") { const n = Listen.pick(r.t, ans); if (n != null) return { n, by: "voice" }; }  // 数として聞き取れなければ不正解にしない
       else if (["not-allowed", "service-not-allowed", "audio-capture"].includes(r.error)) { voiceDown = true; break; }
       else if (r.error === "network") break;
       if (tryNo === 0) { text("もういちど いってね"); await say("p/mouichido", sig); await wait(300, sig); }
     }
+    trace.push("→ボタン");
     text("ボタンで こたえてね"); say("p/button", sig).catch(noop);   // 待たない（ボタンを押したら次の声で止まる）
   }
   return { n: await askButtons(opts, sig), by: "button" };
@@ -181,10 +190,13 @@ async function askOne(q, set, sig, onSolved) {
   if (set.fade === "flash") wait(2000, sig).then(() => { if (my === qSeq && !keep) frameOn(false); }).catch(noop);
 
   let miss = 0, first = null;
+  const trace = [];   // 聞き取りの記録（答えるたびに「｜」で区切る）
   for (;;) {
     text("");
     await say(`q/${a}_${b}`, sig); await wait(300, sig);
-    const t0 = Date.now(), got = await getAnswer(ans, opts, set.input, sig), secs = (Date.now() - t0) / 1000;
+    if (trace.length) trace.push("｜");
+    const t0 = Date.now(), got = await getAnswer(ans, opts, set.input, sig, trace), secs = (Date.now() - t0) / 1000;
+    trace.push(`→${got.n}`);
     if (!first) first = { secs, by: got.by };
     if (got.n === ans) {
       showAns(ans); text("せいかい！"); celebrate(); onSolved();
@@ -203,13 +215,15 @@ async function askOne(q, set, sig, onSolved) {
     for (let k = 0; k < ans; k++) { cells[k].classList.add("lit"); await say(`n/${k + 1}`, sig); }
     await wait(400, sig);
     text("こたえは いくつかな？"); await say("p/iete", sig); await wait(300, sig);
-    await getAnswer(ans, opts, set.input, sig);   // 何と言っても受け取る
+    trace.push("｜");
+    const got2 = await getAnswer(ans, opts, set.input, sig, trace);   // 何と言っても受け取る
+    trace.push(`→${got2.n}`);
     cells.forEach(c => c.classList.remove("lit"));
     showAns(ans); text(""); onSolved();
     await say("p/kazoeta", sig);
     break;
   }
-  return { miss, secs: Math.round(first.secs * 10) / 10, voice: first.by === "voice" };
+  return { miss, secs: Math.round(first.secs * 10) / 10, voice: first.by === "voice", lg: trace.join(" ") };
 }
 
 /* ---------- 1回（5問） ---------- */
@@ -230,7 +244,7 @@ async function startRound() {
     while (queue.length) {
       const q = queue.shift();
       const r = await askOne(q, set, sig, () => { if (!q.again) drawProg(++done, qs.length, true); });
-      Store.addQuestion({ s: q.s, rs: set.stage, a: q.a, b: q.b, f: r.miss ? 0 : 1, m: r.miss, sec: r.secs, v: r.voice ? 1 : 0, r: q.again ? 1 : 0 });
+      Store.addQuestion({ s: q.s, rs: set.stage, a: q.a, b: q.b, f: r.miss ? 0 : 1, m: r.miss, sec: r.secs, v: r.voice ? 1 : 0, r: q.again ? 1 : 0, lg: r.lg });
       if (!q.again && !r.miss) firsts++;
       if (!q.again && r.miss >= 2) queue.push(Object.assign({}, q, { again: true }));
       await wait(700, sig);

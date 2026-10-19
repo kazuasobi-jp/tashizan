@@ -2,11 +2,12 @@
    tashizan.settings  { stage, fade, limit, input }
    tashizan.log       1問ごと [{ t, d, s, rs, a, b, f, m, sec, v, r }]
                       f＝一発正解 1/0、m＝まちがえた回数、sec＝1回目に答えるまでの秒、v＝声で答えた 1/0、r＝最後にもう一度の問題 1/0
+                      lg＝聞き取りの記録（文字。app.js の traceOf。直近 MAX_LG 問だけ残す）
    tashizan.rounds    1回ごと [{ t, d, s, f }]  f＝5問のうち一発正解の数
    tashizan.stickers  もらったシールの数（10まいで台紙1枚） */
 (function (root) {
   "use strict";
-  const P = "tashizan.", MAX_LOG = 3000, MAX_ROUNDS = 1000;
+  const P = "tashizan.", MAX_LOG = 3000, MAX_ROUNDS = 1000, MAX_LG = 300;
   const DEF = { stage: "s1", fade: "show", limit: 2, input: "voice" };
   // fade（絵の減らし方）：show＝ずっと出す / flash＝2秒見せて消す / hint＝まちがえたら出す / none＝数式だけ（一緒に数えるときだけ出す）
   const FADES = [["show", "絵をずっと出す"], ["flash", "2秒見せて消す"], ["hint", "まちがえたら出す"], ["none", "数式だけ"]];
@@ -38,6 +39,7 @@
     addQuestion(rec) {
       const log = S.log(); log.push(Object.assign({ t: S.now(), d: S.today() }, rec));
       if (log.length > MAX_LOG) log.splice(0, log.length - MAX_LOG);
+      if (log.length > MAX_LG) delete log[log.length - MAX_LG - 1].lg;   // 古い問題の聞き取りの記録は消す（容量）
       return set("log", log);
     },
     /* 1回が終わった：記録してシールを1まい増やす。増やした後のシールの数を返す */
@@ -81,10 +83,11 @@
       const st = S.settings(), lines = [`たしざん 記録（${S.today()} 書き出し）`,
         `設定：段階 ${st.stage}・絵 ${st.fade}・1日 ${st.limit}回・答え方 ${st.input}・シール ${S.stickers()}まい`, "", "日付 回 問題 一発正解 中央値秒"];
       S.days(60).forEach(x => lines.push(`${x.d} ${x.rounds} ${x.n} ${x.firsts} ${x.med == null ? "-" : x.med}`));
-      lines.push("", "1問ごと（日付 時刻 段階 問題 一発 まちがい 秒 声 もう一度）");
+      lines.push("", "1問ごと（日付 時刻 段階 問題 一発 まちがい 秒 声 もう一度）",
+        "  聞き取り：聞いた1回ずつ 開＝マイクが開くまで・声＝声が届くまで・終＝終わるまで（秒、聞き始めから）と結果。→は答え、｜は答え直し");
       S.log().slice(-200).forEach(r => {
         const tm = new Date(r.t), hm = `${String(tm.getHours()).padStart(2, "0")}:${String(tm.getMinutes()).padStart(2, "0")}`;
-        lines.push(`${r.d} ${hm} ${r.s} ${r.a}+${r.b} ${r.f} ${r.m} ${r.sec} ${r.v} ${r.r}`);
+        lines.push(`${r.d} ${hm} ${r.s} ${r.a}+${r.b} ${r.f} ${r.m} ${r.sec} ${r.v} ${r.r}` + (r.lg ? `\n    聞き取り：${r.lg}` : ""));
       });
       return lines.join("\n");
     },
