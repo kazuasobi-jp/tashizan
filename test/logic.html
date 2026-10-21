@@ -34,6 +34,26 @@ for (let i = 0; i < 300; i++) {
   if (i === 299) ok(true, "①'の1回は 5といくつ4問＋①1問（300回）");
 }
 eq(Quiz.makeRound("nai").every(q => q.s === "s1"), true, "知らない段階は①");
+{ // ② 答え6〜10
+  const st = Quiz.byId("s2");
+  eq(st.pool.length, 35, "②は1以上どうしで答え6〜10の35組");
+  ok(st.pool.every(([a, b]) => a >= 1 && b >= 1 && a + b >= 6 && a + b <= 10), "②の組は答え6〜10");
+  eq(st.zero.length, 10, "②の0の問題は10組（6+0〜10+0、0+6〜0+10）");
+  let zeros = 0, swaps = 0, bad = null;
+  for (let i = 0; i < 3000 && !bad; i++) {
+    const r = Quiz.makeRound("s2"), main = r.filter(q => q.s === "s2"), mix = r.filter(q => q.s === "s1");
+    const keys = r.map(q => q.a + "_" + q.b);
+    if (r.length !== 5 || new Set(keys).size !== 5 || mix.length !== 1 || mix[0].a + mix[0].b > 5 ||
+        !main.every(q => q.a + q.b >= 6 && q.a + q.b <= 10) || r.some(q => "sw" in q)) bad = r;
+    const z = main.filter(q => q.a === 0 || q.b === 0).length; if (z > 1) bad = r; zeros += z;
+    for (let k = 0; k < 4; k++) if (r[k].a === r[k + 1].b && r[k].b === r[k + 1].a) swaps++;
+    // 入れかえの組（a≠b で b_a もある）は続けて出す
+    keys.forEach((x, k) => { const [a, b] = x.split("_"), j = keys.indexOf(b + "_" + a); if (a !== b && j >= 0 && Math.abs(j - k) !== 1) bad = r; });
+  }
+  ok(!bad, "②の1回は5問・重なりなし・①を1問・0は多くて1問・入れかえは続けて（3000回）" + (bad ? " " + JSON.stringify(bad) : ""));
+  ok(zeros > 600 && zeros < 1200, `②の0の問題はときどき（3000回で ${zeros} 問、目安900）`);
+  ok(swaps > 600 && swaps < 1200, `②の入れかえの組はときどき（3000回で ${swaps} 組、目安900）`);
+}
 for (let a = 0; a <= 10; a++) for (let b = 0; a + b <= 10; b++) {
   for (let k = 0; k < 20; k++) {
     const ans = a + b, o = Quiz.makeOpts(a, b, ans);
