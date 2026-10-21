@@ -61,6 +61,7 @@
   #prog { display: flex; justify-content: center; gap: 10px; font-size: 30px; min-height: 44px; align-items: center; }
   #prog span { width: 40px; height: 40px; display: grid; place-items: center; }
   #prog span.todo { filter: grayscale(1); opacity: .3; }
+  #prog.many { gap: 2px; font-size: 19px; } #prog.many span { width: 26px; height: 26px; }   /* 10こ並んでも⚙️に重ならない幅 */
   #prog span.new { animation: pop .5s ease-out; }
 
   #eq { display: flex; align-items: center; justify-content: center; gap: .18em; font-size: clamp(60px, 19vw, 104px);
@@ -224,7 +225,7 @@
   </div>
 
   <div class="box">
-    <h2>1日の回数（1回＝5問・シール1まい）</h2>
+    <h2>1日の回数（1回＝5問、②は10問・シール1まい）</h2>
     <div class="row">
       <button class="btn step" id="limDown" aria-label="へらす">−</button>
       <span class="big" id="limit"></span><span>回</span>

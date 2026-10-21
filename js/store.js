@@ -3,7 +3,7 @@
    tashizan.log       1問ごと [{ t, d, s, rs, a, b, f, m, sec, v, r }]
                       f＝一発正解 1/0、m＝まちがえた回数、sec＝1回目に答えるまでの秒、v＝声で答えた 1/0、r＝最後にもう一度の問題 1/0
                       lg＝聞き取りの記録（文字。app.js の traceOf。直近 MAX_LG 問だけ残す）
-   tashizan.rounds    1回ごと [{ t, d, s, f }]  f＝5問のうち一発正解の数
+   tashizan.rounds    1回ごと [{ t, d, s, f, n }]  n＝その段階の問題の数、f＝そのうち一発正解の数（10/21 より前は n なし＝混ぜた問題も含めた5問中）
    tashizan.stickers  もらったシールの数（10まいで台紙1枚） */
 (function (root) {
   "use strict";
@@ -55,7 +55,7 @@
 
     /* 段階を上げる・戻す目安（設計メモ。経験的な目安で、決めるのは親）
        上げる：直近15問中13問以上一発正解・3日以上に分けて・答えるまでの中央値 5秒以内
-       戻す：その段階の直近2回が どちらも5問中2問以下 */
+       戻す：その段階の直近2回が どちらも一発正解4割以下（5問中2問以下） */
     advice(stage) {
       const qs = S.log().filter(r => r.s === stage && !r.r).slice(-15);
       const firsts = qs.filter(r => r.f).length, days = new Set(qs.map(r => r.d)).size;
@@ -64,7 +64,7 @@
       return {
         n: qs.length, firsts, days, med,
         up: qs.length >= 15 && firsts >= 13 && days >= 3 && med != null && med <= 5,
-        down: last2.length === 2 && last2.every(r => r.f <= 2),
+        down: last2.length === 2 && last2.every(r => r.f <= Math.floor((r.n || 5) * 0.4)),
       };
     },
 

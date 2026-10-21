@@ -1,5 +1,5 @@
 /* たしざん 本体の流れ。
-   画面：start（はじめる）→ play（5問）→ sheet（シール）→ start か rest（またあしたね）。⚙️3秒長押しで parent（おとな）
+   画面：start（はじめる）→ play（5問。②は10問）→ sheet（シール）→ start か rest（またあしたね）。⚙️3秒長押しで parent（おとな）
    止め方：1回ごとに AbortController を作り、画面を離れるとき abort する（音・聞き取り・待ちがまとめて止まる） */
 "use strict";
 const $ = id => document.getElementById(id);
@@ -113,7 +113,7 @@ function drawFrame(a, b) {
 }
 const frameOn = on => $("frame").classList.toggle("off", !on);
 function drawProg(done, total, bump) {
-  const p = $("prog"); p.innerHTML = "";
+  const p = $("prog"); p.innerHTML = ""; p.classList.toggle("many", total > 5);   // 10問のときは小さく並べる
   for (let i = 0; i < total; i++) { const s = document.createElement("span"); s.textContent = "⭐";
     s.className = i < done ? (bump && i === done - 1 ? "new" : "") : "todo"; p.appendChild(s); }
 }
@@ -226,7 +226,7 @@ async function askOne(q, set, sig, onSolved) {
   return { miss, secs: Math.round(first.secs * 10) / 10, voice: first.by === "voice", lg: trace.join(" ") };
 }
 
-/* ---------- 1回（5問） ---------- */
+/* ---------- 1回（5問。②は10問） ---------- */
 async function startRound() {
   if (Store.todayLeft() <= 0) { goHome(); return; }
   Sound.unlock(); stopAll();
@@ -241,15 +241,16 @@ async function startRound() {
     await wait(300, sig);
     const queue = qs.map(q => Object.assign({ again: false }, q));
     let done = 0, firsts = 0;
+    const own = qs.filter(q => q.s === set.stage).length;   // その段階の問題の数（混ぜた前の段階の問題は、戻す目安に数えない）
     while (queue.length) {
       const q = queue.shift();
       const r = await askOne(q, set, sig, () => { if (!q.again) drawProg(++done, qs.length, true); });
       Store.addQuestion({ s: q.s, rs: set.stage, a: q.a, b: q.b, f: r.miss ? 0 : 1, m: r.miss, sec: r.secs, v: r.voice ? 1 : 0, r: q.again ? 1 : 0, lg: r.lg });
-      if (!q.again && !r.miss) firsts++;
+      if (!q.again && !r.miss && q.s === set.stage) firsts++;
       if (!q.again && r.miss >= 2) queue.push(Object.assign({}, q, { again: true }));
       await wait(700, sig);
     }
-    const n = Store.addRound({ s: set.stage, f: firsts });
+    const n = Store.addRound({ s: set.stage, f: firsts, n: own });
     await say("p/oshimai", sig); await say("p/ganbatta", sig);
     wakeLock(false);
     showSheet(n, sig);
@@ -281,10 +282,10 @@ function drawParent() {
   $("todayN").textContent = `きょう ${Store.roundsToday()}回（のこり ${Math.max(0, Store.todayLeft())}回）`;
 
   const ad = Store.advice(st.stage);
-  const tip = ad.down ? '<span class="tip down">戻しどき（直近2回とも5問中2問以下）</span>'
+  const tip = ad.down ? '<span class="tip down">戻しどき（直近2回とも、この段階の問題の一発正解が4割以下）</span>'
     : ad.up ? '<span class="tip up">上げどき（目安を満たしました）</span>' : '<span class="tip">まだこのまま</span>';
   $("advice").innerHTML = `この段階の直近${ad.n}問：一発正解 ${ad.firsts}問・${ad.days}日・答えるまで中央値 ${ad.med == null ? "-" : ad.med + "秒"}<br>${tip}`
-    + "<br>目安：上げる＝直近15問中13問以上一発正解・3日以上・中央値5秒以内／戻す＝2回続けて5問中2問以下。決めるのはおとなです。";
+    + "<br>目安：上げる＝直近15問中13問以上一発正解・3日以上・中央値5秒以内／戻す＝2回続けて この段階の問題の一発正解が4割以下（5問中2問以下）。決めるのはおとなです。";
 
   const rows = Store.days();
   $("days").innerHTML = rows.length ? rows.map(x => `<tr><td>${x.d.slice(5).replace("-", "/")}</td><td>${x.rounds}</td><td>${x.n}</td>`

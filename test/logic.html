@@ -41,16 +41,16 @@ eq(Quiz.makeRound("nai").every(q => q.s === "s1"), true, "知らない段階は�
   eq(st.zero.length, 10, "②の0の問題は10組（6+0〜10+0、0+6〜0+10）");
   let zeros = 0, swaps = 0, bad = null;
   for (let i = 0; i < 3000 && !bad; i++) {
-    const r = Quiz.makeRound("s2"), main = r.filter(q => q.s === "s2"), mix = r.filter(q => q.s === "s1");
+    const r = Quiz.makeRound("s2"), easy = r.slice(0, 5), main = r.slice(5);
     const keys = r.map(q => q.a + "_" + q.b);
-    if (r.length !== 5 || new Set(keys).size !== 5 || mix.length !== 1 || mix[0].a + mix[0].b > 5 ||
-        !main.every(q => q.a + q.b >= 6 && q.a + q.b <= 10) || r.some(q => "sw" in q)) bad = r;
+    if (r.length !== 10 || new Set(keys).size !== 10 || !easy.every(q => q.s === "s1" && q.a + q.b <= 5) ||
+        !main.every(q => q.s === "s2" && q.a + q.b >= 6 && q.a + q.b <= 10) || r.some(q => "sw" in q)) bad = r;
     const z = main.filter(q => q.a === 0 || q.b === 0).length; if (z > 1) bad = r; zeros += z;
-    for (let k = 0; k < 4; k++) if (r[k].a === r[k + 1].b && r[k].b === r[k + 1].a) swaps++;
+    for (let k = 0; k < 9; k++) if (r[k].a === r[k + 1].b && r[k].b === r[k + 1].a) swaps++;
     // 入れかえの組（a≠b で b_a もある）は続けて出す
     keys.forEach((x, k) => { const [a, b] = x.split("_"), j = keys.indexOf(b + "_" + a); if (a !== b && j >= 0 && Math.abs(j - k) !== 1) bad = r; });
   }
-  ok(!bad, "②の1回は5問・重なりなし・①を1問・0は多くて1問・入れかえは続けて（3000回）" + (bad ? " " + JSON.stringify(bad) : ""));
+  ok(!bad, "②の1回は10問：先に①5問 → 答え6〜10 を5問・重なりなし・0は多くて1問・入れかえは続けて（3000回）" + (bad ? " " + JSON.stringify(bad) : ""));
   ok(zeros > 600 && zeros < 1200, `②の0の問題はときどき（3000回で ${zeros} 問、目安900）`);
   ok(swaps > 600 && swaps < 1200, `②の入れかえの組はときどき（3000回で ${swaps} 組、目安900）`);
 }
@@ -116,6 +116,13 @@ try {
   Store.addRound({ s: "s1", f: 0 }); Store.addRound({ s: "s1b", f: 1 });
   eq(Store.advice("s1b").down, true, "その段階で2回続けて2問以下 → 戻しどき");
   Store.addRound({ s: "s1b", f: 3 }); eq(Store.advice("s1b").down, false, "3問できたら戻さない");
+  // n＝その段階の問題の数（10/21〜）：4割以下で戻しどき
+  wipe(); Store.addRound({ s: "s1b", f: 1, n: 4 }); Store.addRound({ s: "s1b", f: 1, n: 4 });
+  eq(Store.advice("s1b").down, true, "①'（その段階4問）で2回続けて1問 → 戻しどき");
+  wipe(); Store.addRound({ s: "s1b", f: 2, n: 4 }); Store.addRound({ s: "s1b", f: 2, n: 4 });
+  eq(Store.advice("s1b").down, false, "①'で4問中2問 → まだ");
+  wipe(); Store.addRound({ s: "s2", f: 2, n: 5 }); Store.addRound({ s: "s2", f: 2, n: 5 });
+  eq(Store.advice("s2").down, true, "②（答え6〜10 の5問）で2回続けて2問 → 戻しどき");
 
   // 日ごとのまとめ
   wipe();
