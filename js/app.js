@@ -152,11 +152,15 @@ const sec1 = x => (x == null ? "-" : (x / 1000).toFixed(1));
 const traceOf = r => `開${sec1(r.ms && r.ms.o)} 声${sec1(r.ms && r.ms.sp)} 終${sec1(r.ms && r.ms.e)} ` +
   (r.type === "result" ? `「${r.t.join("／")}」` : r.error);
 
+// 「ピコッ」は聞き始める前に鳴らす。10/22 の記録で、マイクが開いた直後に「声0.6 終1.6 no-result」（音が来たのに聞き取れず切れる）が
+// 最初の1回に多かった → 開いた瞬間に鳴らすピコッをマイクが拾っている疑い（推測）。開くのは 0.1〜0.2 秒と速いので、先に鳴らしても遅れない
+const PING_GAP = 250;   // ピコッ（0.2秒）が鳴り終わるまで待つ
 async function listenFor(sig, trace) {
+  Sound.ping(); await wait(PING_GAP, sig);
   const t0 = Date.now();
-  let opened = false, r;
+  let r;
   for (;;) {
-    r = await Listen.once(sig, { onOpen: () => { setMic("on"); if (!opened) Sound.ping(); opened = true; }, onSpeech: () => setMic("heard") });
+    r = await Listen.once(sig, { onOpen: () => setMic("on"), onSpeech: () => setMic("heard") });
     trace.push(traceOf(r));
     if (r.type === "result" || !["no-speech", "no-result", "timeout"].includes(r.error) || Date.now() - t0 >= WAIT_MS) return r;
     setMic("on");   // 声が届いた表示を戻す（数として聞き取れないまま切れたとき）
