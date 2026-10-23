@@ -1,38 +1,50 @@
 /* 聞き取り（Web Speech API、ja-JP）。1回聞いて、聞き取った文字の候補を返す。
    返り値：{ type: "result", t: [文字…] } か { type: "error", error }（no-speech・network・timeout など）
-   どちらにも ms＝{ o: マイクが開いた, sp: 声が届いた, e: 終わった }（start からのミリ秒。なければ null）を付ける（聞き取りの記録用）
+   iPhone で終わりを待たずに受け取ったときは early: true。どちらにも ms＝{ o: マイクが開いた, sp: 声が届いた, e: 終わった }（start からのミリ秒。なければ null）を付ける（聞き取りの記録用）
    signal を abort すると聞くのをやめて AbortError。声は認識のため Google に送られる（数を話す間だけ） */
 (function (root) {
   "use strict";
   const SR = root.SpeechRecognition || root.webkitSpeechRecognition;
-  const TIMEOUT = 12000;  // これより長く返事がなければ打ち切る（端末によって終わりが来ないことがある）
+  // iPhone・iPad（iPadOS は Mac と名乗る）。iPhone の認識は話し終わってから結果が来るまでが遅い（10/23 実機「反応がちょっと遅い」）
+  // → 途中の聞き取り（interim）を受け取り、数が出て言い足しがなければ、終わりを待たずに受け取る
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const SETTLE = 600;          // iPhone：数が出てから、これだけ言い足しがなければ受け取る（「じゅう」→「じゅういち」を待つ）
+  const SETTLE_NONUM = 1500;   // iPhone：数でない言葉のまま止まったら、これで受け取る（→ 聞き直し）
+  const TIMEOUT = IOS ? 8000 : 12000;  // これより長く返事がなければ打ち切る（端末によって終わりが来ないことがある）
 
   /* hooks.onOpen：マイクが開いた（ここで「ピコッ」と光る） / hooks.onSpeech：声が届いた */
   function once(sig, hooks = {}) {
     return new Promise((resolve, reject) => {
       if (sig && sig.aborted) return reject(Sound.abortErr());
-      let done = false, timer = null;
+      let done = false, timer = null, settle = null, part = null;   // part：iPhone の途中の聞き取り
       const rec = new SR(), t0 = Date.now(), ms = { o: null, sp: null, e: null };
       const fin = (r, err) => {
         if (done) return; done = true;
         if (r) { ms.e = Date.now() - t0; r.ms = ms; }
-        clearTimeout(timer); sig && sig.removeEventListener("abort", onAbort);
+        clearTimeout(timer); clearTimeout(settle); sig && sig.removeEventListener("abort", onAbort);
         try { rec.abort(); } catch (e) {}
         err ? reject(err) : resolve(r);
       };
       const onAbort = () => fin(null, Sound.abortErr());
       sig && sig.addEventListener("abort", onAbort, { once: true });
-      rec.lang = "ja-JP"; rec.continuous = false; rec.interimResults = false; rec.maxAlternatives = 5;
+      rec.lang = "ja-JP"; rec.continuous = false; rec.interimResults = IOS; rec.maxAlternatives = 5;
       rec.onaudiostart = () => { if (done) return; ms.o = Date.now() - t0; if (hooks.onOpen) hooks.onOpen(); };
       rec.onspeechstart = () => { if (done) return; ms.sp = Date.now() - t0; if (hooks.onSpeech) hooks.onSpeech(); };
       rec.onresult = e => {
-        const r0 = e.results[0], t = [];
-        for (let i = 0; i < r0.length; i++) t.push(r0[i].transcript);
-        fin({ type: "result", t });
+        const rs = e.results;
+        // 区切られて届いたとき（「じゅう」「いち」）は、つないだものだけ（ばらばらだと 10 と取ってしまう）
+        const t = rs.length > 1 ? [Array.from(rs, r => r[0].transcript).join("")] : Array.from(rs[0], a => a.transcript);
+        if (!IOS || rs[rs.length - 1].isFinal) return fin({ type: "result", t });
+        // iPhone の途中の聞き取り（声が届いた合図が来ない端末もあるので、ここでも🎤を「届いた」に）
+        if (ms.sp == null) { ms.sp = Date.now() - t0; if (hooks.onSpeech) hooks.onSpeech(); }
+        clearTimeout(settle); part = t;
+        const hasNum = t.some(x => NumParse.parseNumber(x).size);
+        settle = setTimeout(() => fin({ type: "result", t, early: true }), hasNum ? SETTLE : SETTLE_NONUM);
       };
       rec.onerror = e => fin({ type: "error", error: e.error });
-      rec.onend = () => fin({ type: "error", error: "no-result" });
-      timer = setTimeout(() => fin({ type: "error", error: "timeout" }), TIMEOUT);
+      const partOr = error => (part ? { type: "result", t: part, early: true } : { type: "error", error });   // 途中まで聞けていたらそれを
+      rec.onend = () => fin(partOr("no-result"));
+      timer = setTimeout(() => fin(partOr("timeout")), TIMEOUT);
       try { rec.start(); } catch (e) { fin({ type: "error", error: "start-failed" }); }
     });
   }
