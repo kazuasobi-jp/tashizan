@@ -155,12 +155,12 @@ const traceOf = r => `開${sec1(r.ms && r.ms.o)} 声${sec1(r.ms && r.ms.sp)} 終
 // 「ピコッ」は聞き始める前に鳴らす。10/22 の記録で、マイクが開いた直後に「声0.6 終1.6 no-result」（音が来たのに聞き取れず切れる）が
 // 最初の1回に多かった → 開いた瞬間に鳴らすピコッをマイクが拾っている疑い（推測）。開くのは 0.1〜0.2 秒と速いので、先に鳴らしても遅れない
 const PING_GAP = 250;   // ピコッ（0.2秒）が鳴り終わるまで待つ
-async function listenFor(sig, trace) {
+async function listenFor(sig, trace, ans) {
   Sound.ping(); await wait(PING_GAP, sig);
   const t0 = Date.now();
   let r;
   for (;;) {
-    r = await Listen.once(sig, { onOpen: () => setMic("on"), onSpeech: () => setMic("heard") });
+    r = await Listen.once(sig, { onOpen: () => setMic("on"), onSpeech: () => setMic("heard") }, ans);
     trace.push(traceOf(r));
     if (r.type === "result" || !["no-speech", "no-result", "timeout"].includes(r.error) || Date.now() - t0 >= WAIT_MS) return r;
     setMic("on");   // 声が届いた表示を戻す（数として聞き取れないまま切れたとき）
@@ -171,7 +171,7 @@ async function getAnswer(ans, opts, input, sig, trace = []) {
   if (input === "voice" && Listen.available() && navigator.onLine && !voiceDown) {
     for (let tryNo = 0; tryNo < 2; tryNo++) {
       if (tryNo) trace.push("→もういちど");
-      const r = await listenFor(sig, trace);
+      const r = await listenFor(sig, trace, ans);
       setMic("");
       if (r.type === "result") { const n = Listen.pick(r.t, ans); if (n != null) return { n, by: "voice" }; }  // 数として聞き取れなければ不正解にしない
       else if (["not-allowed", "service-not-allowed", "audio-capture"].includes(r.error)) { voiceDown = true; break; }
